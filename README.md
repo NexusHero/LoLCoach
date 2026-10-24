@@ -8,11 +8,11 @@
 
 > **Real-time AI coaching overlay for League of Legends — runs entirely on your machine, no account required.**
 
-| Off-game (ready to coach) | In-game (active session) |
+| Off-game (standby radar) | In-game (Bento HUD cockpit) |
 |---|---|
 | ![LoL Coach — waiting for a match](docs/images/offgame-lolcoach.png) | ![LoL Coach — live recommendations](docs/images/ingame-lolcoach.png) |
 
-An AI-powered in-game coaching assistant for League of Legends. A local Node.js core backend reads live game data from the Riot Games Live Client API and streams real-time recommendations to a Flutter desktop app over WebSocket.
+An AI-powered in-game coaching assistant for League of Legends. A local Node.js core backend reads live game data from the Riot Games Live Client API and streams real-time recommendations to a modern Esports HUD desktop app built with Flutter over WebSocket.
 
 The coaching engine is LLM-powered (Claude, OpenAI, or Gemini): it turns your live game state into role-aware, matchup-specific advice — not generic tips. Without an API key the app still runs locally and shows your live scoreboard and game state; item advice requires a configured provider.
 
@@ -50,12 +50,14 @@ Open **Settings**, enter your Summoner Name and an LLM API key (required for ite
 
 ## What it does
 
+- **Modern Esports HUD & Bento Cockpit** — adaptive two-column desktop layout with 3D specular glass cards, tabular numeric telemetry (timer, gold, KDA, CS), and dynamic Riot Data Dragon champion splash art backdrops.
 - **Role-aware strategy** — advice adapts to your role. A support gets vision-score feedback and ADC-protection cues; a Tryndamere top gets split-push timing, not "group for teamfights".
-- **Lane matchup analysis** — compares your CS, KDA, level and items against your specific lane opponent in real time.
+- **Lane matchup duel & analysis** — visual champion duel chip (`Your Champ vs. Lane Opponent`) comparing your CS, KDA, level and items against your specific lane opponent in real time.
 - **Concrete counter-play** — one actionable sentence: what to do *right now* against this specific champion.
-- **Counter-item recommendations** — flags Grievous Wounds, Banshee's Veil, QSS, or Randuin's based on the enemy composition across all 170+ champions.
+- **Visual item build path** — highlights your immediate core item spike and numbers subsequent situational counter-items (`2`, `3`, …) across all 170+ champions.
+- **Pro scoreboard & stat gauges** — side-by-side 5v5 team comparison with a live team-kills tug-of-war bar and colour-coded champion stat gauges (`HP`, `AD`/`AP`, `ARM`, `MR`, `CRIT`).
 - **Multi-provider AI** — plug in your own Claude, OpenAI, or Gemini API key. Item advice requires a configured provider; without one the app still shows live game state and the scoreboard.
-- **Trigger on events** — recommendations fire on `GAME_STARTED`, `ITEM_PURCHASED`, `PLAYER_DIED`, and on manual request via the in-app FAB.
+- **Trigger on events** — recommendations fire on `GAME_STARTED`, `ITEM_PURCHASED`, `PLAYER_DIED`, `HIGH_GOLD_REACHED`, and on manual request via the integrated HUD `Refresh` action button.
 
 ---
 
@@ -81,10 +83,10 @@ Open **Settings**, enter your Summoner Name and an LLM API key (required for ite
                             ▼
               ┌─────────────────────────┐
               │  Flutter Desktop App    │
-              │  Live scoreboard        │
-              │  Counter-item picks     │
-              │  Lane matchup analysis  │
-              │  Role-specific strategy │
+              │  Bento HUD cockpit      │
+              │  Visual item build path │
+              │  Lane matchup duel      │
+              │  Tug-of-war scoreboard  │
               │  Settings & Connection  │
               └─────────────────────────┘
 ```
@@ -176,13 +178,17 @@ lolclient/
 │   │   └── index.ts          # Entry point / DI wiring
 │   └── src/__tests__/        # Jest unit + integration + E2E tests
 │
-├── app/                      # UI (Flutter)
+├── app/                      # UI (Flutter — Modern Esports HUD)
 │   ├── lib/
+│   │   ├── controllers/      # SettingsController + ThemeController
 │   │   ├── models/           # Data models (Strategy, ItemRecommendation, …)
-│   │   ├── services/         # CoachService + WsClient (ChangeNotifier)
-│   │   ├── providers.dart    # riverpod provider definitions (DI / lifecycle)
-│   │   ├── screens/          # MainScreen, HomeScreen (Coach tab)
-│   │   └── widgets/          # RecommendationPanel, GameView, ConnectionForm
+│   │   ├── services/         # CoachService, WsClient, StorageService
+│   │   ├── providers.dart    # Riverpod provider definitions (DI / lifecycle)
+│   │   ├── screens/          # MainScreen, HomeScreen, SettingsScreen
+│   │   ├── theme/            # AppColors, AppTheme, AppTextStyles (tabular HUD)
+│   │   ├── utils/            # Data Dragon icon & splash art helpers
+│   │   └── widgets/          # GameView (Bento HUD), RecommendationPanel,
+│   │                         # GameTopBar, LocalPlayerCard, ScoreboardSection
 │   └── test/                 # Widget, unit and golden tests
 │
 ├── skills/                   # Agent Skills

@@ -11,18 +11,26 @@ class ScoreboardSection extends StatefulWidget {
     required this.allies,
     required this.enemies,
     required this.localPlayer,
+    this.initiallyExpanded = false,
     super.key,
   });
   final List<Player> allies;
   final List<Player> enemies;
   final Player localPlayer;
+  final bool initiallyExpanded;
 
   @override
   State<ScoreboardSection> createState() => _ScoreboardSectionState();
 }
 
 class _ScoreboardSectionState extends State<ScoreboardSection> {
-  bool _expanded = false;
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.initiallyExpanded;
+  }
 
   int _teamKills(Iterable<Player> players) =>
       players.fold(0, (sum, p) => sum + p.scores.kills);
@@ -30,8 +38,12 @@ class _ScoreboardSectionState extends State<ScoreboardSection> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final allyKills = _teamKills([widget.localPlayer, ...widget.allies]);
+    final allAllies = [widget.localPlayer, ...widget.allies];
+    final allyKills = _teamKills(allAllies);
     final enemyKills = _teamKills(widget.enemies);
+    final totalKills = allyKills + enemyKills;
+    final allyRatio = totalKills == 0 ? 0.5 : allyKills / totalKills;
+
     return GameCard(
       padding: EdgeInsets.zero,
       child: Column(
@@ -40,41 +52,70 @@ class _ScoreboardSectionState extends State<ScoreboardSection> {
             onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 12),
+              child: Column(
                 children: [
-                  Text(
-                    'Scoreboard',
-                    style: AppTextStyles.captionBold.copyWith(
-                      color: colors.textSecondary,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        'Scoreboard',
+                        style: AppTextStyles.captionBold.copyWith(
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '$allyKills',
+                        style: AppTextStyles.mono.copyWith(
+                          color: colors.allyBlue,
+                        ),
+                      ),
+                      Text(
+                        ' – ',
+                        style: AppTextStyles.mono.copyWith(
+                          color: colors.textDisabled,
+                        ),
+                      ),
+                      Text(
+                        '$enemyKills',
+                        style: AppTextStyles.mono.copyWith(
+                          color: colors.enemyRed,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                        color: colors.textDisabled,
+                        size: 20,
+                      ),
+                    ],
                   ),
-                  const Spacer(),
-                  // Team-kill summary so the collapsed bar still answers
-                  // "who's ahead?" without duplicating the in-game Tab screen.
-                  Text(
-                    '$allyKills',
-                    style: AppTextStyles.captionBold.copyWith(
-                      color: colors.allyBlue,
+                  const SizedBox(height: 10),
+                  // Tug-of-war team kills bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: SizedBox(
+                      height: 4,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: (allyRatio * 100).round().clamp(5, 95),
+                            child: ColoredBox(
+                              color: colors.allyBlue,
+                              child: const SizedBox.expand(),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Expanded(
+                            flex: ((1 - allyRatio) * 100).round().clamp(5, 95),
+                            child: ColoredBox(
+                              color: colors.enemyRed,
+                              child: const SizedBox.expand(),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  Text(
-                    ' – ',
-                    style: AppTextStyles.caption.copyWith(
-                      color: colors.textDisabled,
-                    ),
-                  ),
-                  Text(
-                    '$enemyKills',
-                    style: AppTextStyles.captionBold.copyWith(
-                      color: colors.enemyRed,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Icon(
-                    _expanded ? Icons.expand_less : Icons.expand_more,
-                    color: colors.textDisabled,
-                    size: 20,
                   ),
                 ],
               ),
@@ -82,17 +123,54 @@ class _ScoreboardSectionState extends State<ScoreboardSection> {
           ),
           if (_expanded) ...[
             Divider(color: colors.hairlineSoft, height: 1),
-            TeamBlock(
-              label: 'ALLIES',
-              players: [widget.localPlayer, ...widget.allies],
-              accentColor: colors.allyBlue,
-              highlightName: widget.localPlayer.summonerName,
-            ),
-            TeamBlock(
-              label: 'ENEMIES',
-              players: widget.enemies,
-              accentColor: colors.enemyRed,
-              highlightName: null,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth >= 480) {
+                  return IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: TeamBlock(
+                            label: 'ALLIES',
+                            players: allAllies,
+                            accentColor: colors.allyBlue,
+                            highlightName: widget.localPlayer.summonerName,
+                          ),
+                        ),
+                        VerticalDivider(
+                          color: colors.hairlineSoft,
+                          width: 1,
+                        ),
+                        Expanded(
+                          child: TeamBlock(
+                            label: 'ENEMIES',
+                            players: widget.enemies,
+                            accentColor: colors.enemyRed,
+                            highlightName: null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return Column(
+                  children: [
+                    TeamBlock(
+                      label: 'ALLIES',
+                      players: allAllies,
+                      accentColor: colors.allyBlue,
+                      highlightName: widget.localPlayer.summonerName,
+                    ),
+                    TeamBlock(
+                      label: 'ENEMIES',
+                      players: widget.enemies,
+                      accentColor: colors.enemyRed,
+                      highlightName: null,
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 8),
           ],
@@ -121,7 +199,7 @@ class TeamBlock extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Text(
             label,
             style: AppTextStyles.eyebrow.copyWith(
@@ -155,9 +233,8 @@ class PlayerRow extends StatelessWidget {
     final colors = context.colors;
     final s = player.scores;
     return Container(
-      color:
-          isHighlighted ? colors.magicSubtle : Colors.transparent,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      color: isHighlighted ? colors.magicSubtle : Colors.transparent,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
           ChampAvatar(
@@ -178,11 +255,11 @@ class PlayerRow extends StatelessWidget {
           ),
           Text(
             '${s.kills}/${s.deaths}/${s.assists}',
-            style: AppTextStyles.micro.copyWith(color: colors.textDisabled),
+            style: AppTextStyles.micro.copyWith(color: colors.textSecondary),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           SizedBox(
-            width: 42,
+            width: 44,
             child: Text(
               '${s.creepScore} cs',
               style: AppTextStyles.micro.copyWith(color: colors.textDisabled),

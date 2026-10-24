@@ -9,10 +9,12 @@ import 'package:flutter/material.dart';
 /// a non-primary tone is wanted, set it at the call site, e.g.
 /// `AppTextStyles.caption.copyWith(color: context.colors.textSecondary)`.
 class AppTextStyles {
-  /// 27 — the single big "do this now" action.
+  static const _tabular = <FontFeature>[FontFeature.tabularFigures()];
+
+  /// 26 — the single big "do this now" action.
   static const hero = TextStyle(
-    fontSize: 27,
-    fontWeight: FontWeight.w600,
+    fontSize: 26,
+    fontWeight: FontWeight.w700,
     letterSpacing: -0.7,
     height: 1.18,
   );
@@ -20,8 +22,8 @@ class AppTextStyles {
   /// 20 — screen titles ("Ready to coach").
   static const title = TextStyle(
     fontSize: 20,
-    fontWeight: FontWeight.w600,
-    letterSpacing: -0.4,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.45,
   );
 
   /// 16 — item name, card headers, wordmark.
@@ -64,13 +66,29 @@ class AppTextStyles {
     fontSize: 12,
     fontWeight: FontWeight.w500,
     letterSpacing: -0.12,
+    fontFeatures: _tabular,
   );
 
   /// 11 — the rare, deliberate UPPERCASE label ("DO THIS NOW", "MATCHUP").
   static const eyebrow = TextStyle(
     fontSize: 11,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w700,
     letterSpacing: 1.5,
+  );
+
+  /// Tabular numeric telemetry styles for HUD counters (timer, gold, KDA, CS).
+  static const mono = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.2,
+    fontFeatures: _tabular,
+  );
+
+  static const monoLarge = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.3,
+    fontFeatures: _tabular,
   );
 
   // ── Back-compat aliases ────────────────────────────────────────────────

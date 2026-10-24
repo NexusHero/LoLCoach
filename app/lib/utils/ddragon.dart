@@ -42,13 +42,21 @@ Future<void> initDDragonVersion() async {
 }
 
 String champImageUrl(String name) {
-  final key = _kChampOverrides[name] ??
-      name
-          .replaceAll("'", '')
-          .replaceAll('.', '')
-          .replaceAll(' & ', '')
-          .replaceAll(' ', '');
+  final key = _champKey(name);
   return '$_kBase/$_version/img/champion/$key.png';
 }
+
+String champSplashUrl(String name) {
+  final key = _champKey(name);
+  return '$_kBase/img/champion/splash/${key}_0.jpg';
+}
+
+String _champKey(String name) =>
+    _kChampOverrides[name] ??
+    name
+        .replaceAll("'", '')
+        .replaceAll('.', '')
+        .replaceAll(' & ', '')
+        .replaceAll(' ', '');
 
 String itemImageUrl(int itemId) => '$_kBase/$_version/img/item/$itemId.png';

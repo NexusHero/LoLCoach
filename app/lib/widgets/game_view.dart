@@ -25,6 +25,7 @@ class GameView extends StatelessWidget {
     this.isBudgetExceeded = false,
     this.riskLevel,
     this.onRiskLevelChanged,
+    this.onRefresh,
     this.aiEnabled = true,
   });
   final ParsedGameState gameState;
@@ -38,6 +39,7 @@ class GameView extends StatelessWidget {
   final bool isBudgetExceeded;
   final String? riskLevel;
   final ValueChanged<String>? onRiskLevelChanged;
+  final VoidCallback? onRefresh;
 
   /// Whether an AI provider is active. In Basic rules mode the bridge never
   /// emits a RECOMMENDATION_UPDATE, so the hero slot must not show a loading
@@ -57,52 +59,91 @@ class GameView extends StatelessWidget {
     return null;
   }
 
+  Widget _buildHeroSection() {
+    if (recommendation != null) {
+      return RecommendationPanel(
+        recommendation: recommendation!,
+        triggerEvent: triggerEvent,
+        localChampion: gameState.localPlayer.championName,
+        opponentChampion: _laneOpponent,
+        isAnalyzing: isAnalyzing,
+        recommendationTime: recommendationTime,
+        tokenUsage: tokenUsage,
+        tokenBudget: tokenBudget,
+        isBudgetExceeded: isBudgetExceeded,
+      );
+    }
+    if (aiEnabled) return const _AwaitingAdvice();
+    return const _BasicModeNotice();
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Hierarchy by what matters most while glancing mid-match:
-    //   1. Context strip — time / gold / risk (always pinned context)
-    //   2. RECOMMENDATION — the app's only unique value, rendered as hero
-    //   3. My champion — supporting context, compact
-    //   4. Scoreboard — tertiary, duplicates the in-game Tab screen, collapsed
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          GameTopBar(
-            gameState: gameState,
-            riskLevel: riskLevel,
-            onRiskLevelChanged: onRiskLevelChanged,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 780;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              GameTopBar(
+                gameState: gameState,
+                riskLevel: riskLevel,
+                onRiskLevelChanged: onRiskLevelChanged,
+                onRefresh: onRefresh,
+                isAnalyzing: isAnalyzing,
+              ),
+              const SizedBox(height: 14),
+              if (isWide)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 11,
+                      child: _buildHeroSection(),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      flex: 9,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          LocalPlayerCard(
+                            player: gameState.localPlayer,
+                            activePlayer: gameState.activePlayer,
+                          ),
+                          const SizedBox(height: 14),
+                          ScoreboardSection(
+                            allies: gameState.allies,
+                            enemies: gameState.enemies,
+                            localPlayer: gameState.localPlayer,
+                            initiallyExpanded: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                )
+              else ...[
+                _buildHeroSection(),
+                const SizedBox(height: 12),
+                LocalPlayerCard(
+                  player: gameState.localPlayer,
+                  activePlayer: gameState.activePlayer,
+                ),
+                const SizedBox(height: 12),
+                ScoreboardSection(
+                  allies: gameState.allies,
+                  enemies: gameState.enemies,
+                  localPlayer: gameState.localPlayer,
+                ),
+              ],
+            ],
           ),
-          const SizedBox(height: 12),
-          if (recommendation != null)
-            RecommendationPanel(
-              recommendation: recommendation!,
-              triggerEvent: triggerEvent,
-              opponentChampion: _laneOpponent,
-              isAnalyzing: isAnalyzing,
-              recommendationTime: recommendationTime,
-              tokenUsage: tokenUsage,
-              tokenBudget: tokenBudget,
-              isBudgetExceeded: isBudgetExceeded,
-            )
-          else if (aiEnabled)
-            const _AwaitingAdvice()
-          else
-            const _BasicModeNotice(),
-          const SizedBox(height: 12),
-          LocalPlayerCard(
-            player: gameState.localPlayer,
-            activePlayer: gameState.activePlayer,
-          ),
-          const SizedBox(height: 12),
-          ScoreboardSection(
-            allies: gameState.allies,
-            enemies: gameState.enemies,
-            localPlayer: gameState.localPlayer,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -117,19 +158,31 @@ class _AwaitingAdvice extends StatelessWidget {
     final colors = context.colors;
     return GameCard(
       accent: colors.magicLine,
-      child: Row(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2, color: colors.magic),
+          Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colors.magic,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'ANALYSING MATCH STATE',
+                style: AppTextStyles.eyebrow.copyWith(color: colors.magic),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              'Reading the match — first advice lands shortly.',
-              style: AppTextStyles.body.copyWith(color: colors.textSecondary),
-            ),
+          const SizedBox(height: 12),
+          Text(
+            'Reading the match — first advice lands shortly.',
+            style: AppTextStyles.body.copyWith(color: colors.textSecondary),
           ),
         ],
       ),

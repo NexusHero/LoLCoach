@@ -7,6 +7,7 @@ import 'package:lol_coach/services/ws_client.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/app_background.dart';
+import 'package:lol_coach/widgets/common/game_card.dart';
 import 'package:lol_coach/widgets/game_view.dart';
 
 String _providerLabel(String type) => switch (type) {
@@ -29,11 +30,26 @@ class HomeScreen extends ConsumerWidget {
     return ListenableBuilder(
       listenable: ws,
       builder: (context, _) {
+        final activeChamp = ws.gameActive && ws.gameState != null
+            ? ws.gameState!.localPlayer.championName
+            : null;
+
         return Scaffold(
           extendBodyBehindAppBar: true,
           appBar: AppBar(
             titleSpacing: 20,
-            title: const Text('LoL Coach', style: AppTextStyles.heading),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.shield_outlined,
+                  size: 18,
+                  color: context.colors.magic,
+                ),
+                const SizedBox(width: 8),
+                const Text('LoL Coach', style: AppTextStyles.heading),
+              ],
+            ),
             actions: [
               if (ws.isConnected)
                 Padding(
@@ -58,9 +74,9 @@ class HomeScreen extends ConsumerWidget {
             ],
           ),
           body: AppBackground(
+            championName: activeChamp,
             child: SafeArea(child: _buildBody(context, ws)),
           ),
-          floatingActionButton: ws.gameActive ? _PulsingFab(ws: ws) : null,
         );
       },
     );
@@ -101,6 +117,7 @@ class HomeScreen extends ConsumerWidget {
           riskLevel: _isAiProvider(ws.activeProviderType) ? ws.riskLevel : null,
           onRiskLevelChanged:
               _isAiProvider(ws.activeProviderType) ? ws.setRiskLevel : null,
+          onRefresh: ws.triggerAnalysis,
           aiEnabled: _isAiProvider(ws.activeProviderType),
         );
     }
@@ -109,18 +126,51 @@ class HomeScreen extends ConsumerWidget {
   Widget _buildNotConnectedView(BuildContext context) {
     final colors = context.colors;
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.link_off, size: 52, color: colors.textDisabled),
-          const SizedBox(height: 18),
-          const Text('Not connected', style: AppTextStyles.title),
-          const SizedBox(height: 8),
-          Text(
-            'Open Settings to connect.',
-            style: AppTextStyles.body.copyWith(color: colors.textSecondary),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: GameCard(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: colors.surface2,
+                    border: Border.all(color: colors.border),
+                  ),
+                  child: Icon(
+                    Icons.link_off_rounded,
+                    size: 26,
+                    color: colors.textDisabled,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text('Not connected', style: AppTextStyles.title),
+                const SizedBox(height: 8),
+                Text(
+                  'Open Settings to connect to the local LoL Coach core.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.body.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                ),
+                if (onOpenSettings != null) ...[
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: onOpenSettings,
+                    icon: const Icon(Icons.settings_outlined, size: 16),
+                    label: const Text('Open Settings'),
+                  ),
+                ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -230,116 +280,120 @@ class _LivePillState extends State<_LivePill>
   }
 }
 
-// ─── Pulsing FAB ─────────────────────────────────────────────────────────────
+// ─── Waiting view ────────────────────────────────────────────────────────────
 
-class _PulsingFab extends StatefulWidget {
-  const _PulsingFab({required this.ws});
-  final CoachService ws;
+class _WaitingView extends StatefulWidget {
+  const _WaitingView();
 
   @override
-  State<_PulsingFab> createState() => _PulsingFabState();
+  State<_WaitingView> createState() => _WaitingViewState();
 }
 
-class _PulsingFabState extends State<_PulsingFab>
+class _WaitingViewState extends State<_WaitingView>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _scale;
+  late final AnimationController _pulseCtrl;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+    _pulseCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 2200),
     )..repeat(reverse: true);
-    _scale = Tween<double>(begin: 1, end: 1.05).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _pulseCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final ws = widget.ws;
-    final provider = ws.activeProviderType;
-    final isAi = _isAiProvider(provider) && !ws.llmFailed;
-    // Advice is pushed automatically on key events (level up, item buys,
-    // deaths, gold thresholds). This button is just a manual refresh.
-    final label = ws.isAnalyzing ? 'Analysing…' : 'Refresh advice';
-
-    final fab = FloatingActionButton.extended(
-      onPressed: ws.isAnalyzing ? null : ws.triggerAnalysis,
-      tooltip: 'Manually refresh — advice also updates automatically',
-      backgroundColor: isAi ? colors.magicHot : colors.gold,
-      foregroundColor: Colors.white,
-      elevation: isAi ? 10 : 4,
-      icon: ws.isAnalyzing
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: Colors.white,
-              ),
-            )
-          : const Icon(Icons.refresh),
-      label: Text(label),
-    );
-
-    if (!isAi || ws.isAnalyzing) return fab;
-
-    return AnimatedBuilder(
-      animation: _scale,
-      builder: (_, child) => Transform.scale(scale: _scale.value, child: child),
-      child: fab,
-    );
-  }
-}
-
-// ─── Waiting view ────────────────────────────────────────────────────────────
-
-class _WaitingView extends StatelessWidget {
-  const _WaitingView();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              Icons.sports_esports_outlined,
-              size: 48,
-              color: colors.textDisabled,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: GameCard(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    AnimatedBuilder(
+                      animation: _pulseCtrl,
+                      builder: (_, child) => Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: colors.magicSubtle,
+                          border: Border.all(
+                            color: colors.magic.withValues(
+                              alpha: 0.3 + _pulseCtrl.value * 0.4,
+                            ),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: colors.magic.withValues(
+                                alpha: _pulseCtrl.value * 0.25,
+                              ),
+                              blurRadius: 16,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: child,
+                      ),
+                      child: Icon(
+                        Icons.radar_rounded,
+                        size: 22,
+                        color: colors.magic,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'STANDBY',
+                            style: AppTextStyles.eyebrow.copyWith(
+                              color: colors.magic,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Ready to coach',
+                            style: AppTextStyles.title,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const _StepRow(
+                  done: true,
+                  text: 'Core connected',
+                ),
+                const SizedBox(height: 14),
+                const _StepRow(
+                  done: false,
+                  text: 'Start a League of Legends match',
+                ),
+                const SizedBox(height: 14),
+                const _StepRow(
+                  done: false,
+                  text: 'Advice appears automatically as the match unfolds',
+                ),
+              ],
             ),
-            const SizedBox(height: 22),
-            const Text('Ready to coach', style: AppTextStyles.title),
-            const SizedBox(height: 22),
-            const _StepRow(
-              done: true,
-              text: 'Core connected',
-            ),
-            const SizedBox(height: 14),
-            const _StepRow(
-              done: false,
-              text: 'Start a League of Legends match',
-            ),
-            const SizedBox(height: 14),
-            const _StepRow(
-              done: false,
-              text: 'Advice appears automatically as the match unfolds',
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -358,15 +412,14 @@ class _StepRow extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 18,
-          height: 18,
+          width: 20,
+          height: 20,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
+            color: done ? colors.successSubtle : Colors.transparent,
             border: Border.all(color: color, width: 1.5),
           ),
-          child: done
-              ? Icon(Icons.check, size: 11, color: color)
-              : null,
+          child: done ? Icon(Icons.check, size: 12, color: color) : null,
         ),
         const SizedBox(width: 12),
         Expanded(
