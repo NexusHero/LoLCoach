@@ -47,6 +47,7 @@ const ITEMS_RESPONSE = {
         "3033": {
             name: "Mortal Reminder",
             plaintext: "Reduces healing received",
+            description: "<mainText><stats><attention>30</attention> Attack Damage<br><attention>35%</attention> Armor Penetration<br><attention>15</attention> Ability Haste</stats></mainText>",
             stats: { FlatPhysicalDamageMod: 30 },
             inStore: true,
         },
@@ -230,6 +231,15 @@ describe("DDragonService.getItemInfo", () => {
         await svc.init();
         const info = svc.getItemInfo(8888);
         expect(info?.stats).toBe("35% AS");
+    });
+    it("getItemInfo_ItemWithDescriptionStats_ExtractsNumericAbilityHasteAndPercentPen", async () => {
+        makeFullFetchMock();
+        const svc = new ddragonService_1.DDragonService();
+        await svc.init();
+        const info = svc.getItemInfo(3033);
+        expect(info?.numericStats?.ad).toBe(30);
+        expect(info?.numericStats?.abilityHaste).toBe(15);
+        expect(info?.numericStats?.percentPen).toBe(35);
     });
 });
 // ─── getChampionAbilities ─────────────────────────────────────────────────────

@@ -143,61 +143,69 @@ export class TacticalCommandService {
     const namedEnemy = this.findMatchingEnemy(text, state);
 
     // 1. Check Vector Memory Save ("Merk dir ...", "Remember ...")
-    const rememberMatch = text.match(/^(?:merk\s+dir|remember|notiere)[:\s]+(.+)$/i);
+    const rememberMatch = text.match(/\b(?:merk\s+dir|remember|notiere)[:\s]+(.+)$/i);
     if (rememberMatch) {
       const note = rememberMatch[1].trim();
       const myChamp = state?.localPlayer.championName ?? "General";
-      const oppChamp = namedEnemy?.championName ?? currentOpp?.championName;
+      const noteEnemy = this.findMatchingEnemy(note, state) ?? namedEnemy ?? currentOpp;
+      const oppChamp = noteEnemy?.championName;
       await this.vectorMemory.storeMatchupNote(myChamp, note, oppChamp, clock());
       actions.push(`🧠 Memory: ${oppChamp ?? myChamp}`);
       replyParts.push(`Gespeichert im Vektor-Gedächtnis für ${myChamp}${oppChamp ? ` vs ${oppChamp}` : ""}.`);
     }
 
-    // 2. Check Spell / Summoner Cooldown Callout ("Ahri Flash", "Zed Ult", "Flash down", "Blitz Q")
-    const spellMatch = lower.match(
-      /\b(flash|ignite|teleport|tp|exhaust|ghost|cleanse|heal|barrier|smite|ult|ultimate|\br\b|\bq\b|\bw\b|\be\b)\b/,
-    );
+    // 2. Check Spell / Summoner Cooldown Callout ("Ahri Flash", "Zed Ult", "Zed Flash und R")
+    const spellMatches = [
+      ...lower.matchAll(
+        /\b(flash|ignite|teleport|tp|exhaust|ghost|cleanse|heal|barrier|smite|ult|ultimate|r|q|w|e)\b/g,
+      ),
+    ];
     const isQuestion = lower.includes("?") || /^(wie|warum|was|wann|soll|kann|who|what|why|how|should|can)\b/.test(lower);
 
-    if (spellMatch && (!isQuestion || /\b(timer|cd|down|weg|raus|used|benutzt|setz)\b/.test(lower))) {
+    if (spellMatches.length > 0 && (!isQuestion || /\b(timer|cd|down|weg|raus|used|benutzt|setz)\b/.test(lower))) {
       const targetEnemy = namedEnemy ?? currentOpp;
       if (targetEnemy && state) {
-        const rawSpell = spellMatch[1];
         const gameTime = state.gameTime;
-        let label = rawSpell.toUpperCase();
-        let cdSec = 0;
-        let slotKey = label;
+        const cds = await computeEnemyCooldowns(state, targetEnemy.championName);
+        const seenSlots = new Set<string>();
 
-        if (["q", "w", "e", "r", "ult", "ultimate"].includes(rawSpell)) {
-          const slot = rawSpell.startsWith("u") ? "R" : rawSpell.toUpperCase();
-          slotKey = slot;
-          label = slot;
-          const cds = await computeEnemyCooldowns(state, targetEnemy.championName);
-          cdSec = slot === "Q" ? (cds?.q ?? 8) : slot === "W" ? (cds?.w ?? 14) : slot === "E" ? (cds?.e ?? 15) : (cds?.r ?? 100);
-        } else {
-          const spellName = rawSpell === "tp" ? "Teleport" : rawSpell;
-          const haste = this.computeEnemySummonerHaste(targetEnemy);
-          const parsed = computeSummonerSpellCooldown(spellName, targetEnemy.level, gameTime, haste);
-          if (parsed) {
-            label = parsed.name.toUpperCase();
-            cdSec = parsed.cooldown;
-            slotKey = `SUM_${parsed.name.toUpperCase()}`;
+        for (const match of spellMatches) {
+          const rawSpell = match[1];
+          let label = rawSpell.toUpperCase();
+          let cdSec = 0;
+          let slotKey = label;
+
+          if (["q", "w", "e", "r", "ult", "ultimate"].includes(rawSpell)) {
+            const slot = rawSpell.startsWith("u") ? "R" : rawSpell.toUpperCase();
+            slotKey = slot;
+            label = slot;
+            cdSec = slot === "Q" ? (cds?.q ?? 8) : slot === "W" ? (cds?.w ?? 14) : slot === "E" ? (cds?.e ?? 15) : (cds?.r ?? 100);
+          } else {
+            const spellName = rawSpell === "tp" ? "Teleport" : rawSpell;
+            const haste = this.computeEnemySummonerHaste(targetEnemy);
+            const parsed = computeSummonerSpellCooldown(spellName, targetEnemy.level, gameTime, haste);
+            if (parsed) {
+              label = parsed.name.toUpperCase();
+              cdSec = parsed.cooldown;
+              slotKey = `SUM_${parsed.name.toUpperCase()}`;
+            }
           }
-        }
 
-        if (cdSec > 0) {
-          const timerKey = `${targetEnemy.championName}_${slotKey}`;
-          this.overrides.activeTimers = this.overrides.activeTimers.filter((t) => t.key !== timerKey);
-          this.overrides.activeTimers.push({
-            key: timerKey,
-            label,
-            championName: targetEnemy.championName,
-            remainingSeconds: cdSec,
-            totalSeconds: cdSec,
-            expiresAtGameTime: gameTime + cdSec,
-          });
-          actions.push(`⏱ ${targetEnemy.championName} ${label} (${cdSec}s)`);
-          replyParts.push(`${targetEnemy.championName} ${label} Timer läuft (${cdSec}s) — Fenster ausnutzen!`);
+          if (cdSec > 0 && !seenSlots.has(slotKey)) {
+            seenSlots.add(slotKey);
+            const timerKey = `${targetEnemy.championName}_${slotKey}`;
+            this.overrides.activeTimers = this.overrides.activeTimers.filter((t) => t.key !== timerKey);
+            this.overrides.activeTimers.push({
+              key: timerKey,
+              label,
+              championName: targetEnemy.championName,
+              remainingSeconds: cdSec,
+              totalSeconds: cdSec,
+              expiresAtGameTime: gameTime + cdSec,
+            });
+            actions.push(`⏱ ${targetEnemy.championName} ${label} (${cdSec}s)`);
+            replyParts.push(`${targetEnemy.championName} ${label} Timer läuft (${cdSec}s) — Fenster ausnutzen!`);
+          }
         }
       }
     }
@@ -221,13 +229,16 @@ export class TacticalCommandService {
     }
 
     // 5. Check Enemy Build Override ("Kai'Sa geht AP", "Varus AP", "Diana Tank")
-    const buildOverrideMatch = lower.match(/\b(geht\s+auf|baut|ist\s+voll|buildet|playing|going)?\s*\b(ap|ad|tank)\b/i);
-    if (buildOverrideMatch && namedEnemy && !/\b(ich|my|mein)\b/.test(lower)) {
-      const style = buildOverrideMatch[2].toLowerCase() as "ad" | "ap" | "tank";
-      this.overrides.enemyBuildOverrides[namedEnemy.championName] = style;
-      actions.push(`🎯 ${namedEnemy.championName} → ${style.toUpperCase()}`);
-      replyParts.push(`${namedEnemy.championName} als ${style.toUpperCase()}-Threat registriert — Resistenz-Empfehlung angepasst.`);
-      shouldReevaluate = true;
+    for (const clause of text.split(/[,;.]+/)) {
+      const m = clause.match(/\b(geht\s+auf|geht|baut|ist\s+voll|buildet|playing|going)?\s*\b(ap|ad|tank)\b/i);
+      const clauseEnemy = this.findMatchingEnemy(clause, state);
+      if (m && clauseEnemy) {
+        const style = m[2].toLowerCase() as "ad" | "ap" | "tank";
+        this.overrides.enemyBuildOverrides[clauseEnemy.championName] = style;
+        actions.push(`🎯 ${clauseEnemy.championName} → ${style.toUpperCase()}`);
+        replyParts.push(`${clauseEnemy.championName} als ${style.toUpperCase()}-Threat registriert — Resistenz-Empfehlung angepasst.`);
+        shouldReevaluate = true;
+      }
     }
 
     // 6. Check App / HUD Mode Controls

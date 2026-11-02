@@ -24,6 +24,8 @@ let RecommendationEngine = class RecommendationEngine {
     buildFocus = types_js_1.DEFAULT_BUILD_FOCUS;
     preferPassiveItems = false;
     habitWarnings = [];
+    liveOverrides;
+    vectorMemories = [];
     lastRecommendedItems = [];
     lastLlmGameTime = -999;
     setRiskLevel(level) {
@@ -47,6 +49,12 @@ let RecommendationEngine = class RecommendationEngine {
     setHabitWarnings(warnings) {
         this.habitWarnings = warnings;
     }
+    setLiveOverrides(overrides) {
+        this.liveOverrides = overrides;
+    }
+    setVectorMemories(memories) {
+        this.vectorMemories = memories;
+    }
     getLastRecommendedItems() {
         return this.lastRecommendedItems;
     }
@@ -65,6 +73,8 @@ let RecommendationEngine = class RecommendationEngine {
         this.cache.clear();
         this.sessionInputTokens = 0;
         this.sessionOutputTokens = 0;
+        this.liveOverrides = undefined;
+        this.vectorMemories = [];
         this.lastRecommendedItems = [];
         this.lastLlmGameTime = -999;
     }
@@ -100,7 +110,20 @@ let RecommendationEngine = class RecommendationEngine {
             callbacks.onLlmBudgetExceeded(this.sessionInputTokens, this.tokenBudget);
             return;
         }
-        const cacheKey = this.cache.buildKey(state, this.riskLevel, this.buildFocus, this.preferPassiveItems);
+        const hasOverrides = this.liveOverrides !== undefined &&
+            (Boolean(this.liveOverrides.laneOpponentOverride) ||
+                Boolean(this.liveOverrides.campedStatus) ||
+                Object.keys(this.liveOverrides.enemyBuildOverrides).length > 0 ||
+                this.liveOverrides.tacticalNotes.length > 0);
+        const overrideSig = hasOverrides
+            ? JSON.stringify({
+                l: this.liveOverrides?.laneOpponentOverride,
+                c: this.liveOverrides?.campedStatus,
+                b: this.liveOverrides?.enemyBuildOverrides,
+                n: this.liveOverrides?.tacticalNotes,
+            })
+            : "";
+        const cacheKey = this.cache.buildKey(state, this.riskLevel, this.buildFocus, this.preferPassiveItems, overrideSig);
         const cached = this.cache.get(cacheKey);
         let llmAnalysis;
         if (cached) {
@@ -111,12 +134,16 @@ let RecommendationEngine = class RecommendationEngine {
             try {
                 const hasExtraOptions = this.buildFocus !== types_js_1.DEFAULT_BUILD_FOCUS ||
                     this.preferPassiveItems ||
-                    this.habitWarnings.length > 0;
+                    this.habitWarnings.length > 0 ||
+                    hasOverrides ||
+                    this.vectorMemories.length > 0;
                 llmAnalysis = hasExtraOptions
                     ? await this.llmProvider.getAnalysis(state, this.riskLevel, {
                         buildFocus: this.buildFocus,
                         preferPassiveItems: this.preferPassiveItems,
                         habitWarnings: this.habitWarnings,
+                        ...(hasOverrides && this.liveOverrides ? { liveOverrides: this.liveOverrides } : {}),
+                        ...(this.vectorMemories.length > 0 ? { vectorMemories: this.vectorMemories } : {}),
                     })
                     : await this.llmProvider.getAnalysis(state, this.riskLevel);
                 this.lastLlmGameTime = state.gameTime;

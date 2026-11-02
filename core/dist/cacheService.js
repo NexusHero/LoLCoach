@@ -29,7 +29,7 @@ let CacheService = class CacheService {
     clear() {
         this.store.clear();
     }
-    buildKey(state, risk = types_js_1.DEFAULT_RISK_LEVEL, buildFocus = types_js_1.DEFAULT_BUILD_FOCUS, preferPassive = false) {
+    buildKey(state, risk = types_js_1.DEFAULT_RISK_LEVEL, buildFocus = types_js_1.DEFAULT_BUILD_FOCUS, preferPassive = false, overrideSig = "") {
         const goldBucket = Math.floor(state.activePlayer.currentGold / 500);
         const phase = (0, stateMinifier_js_1.getGamePhase)(state.gameTime);
         const killsBucket = Math.floor(state.localPlayer.scores.kills / 3);
@@ -54,6 +54,7 @@ let CacheService = class CacheService {
             `e:${enemyNames}`,
             `eitems:${enemyCoreItems}`,
             `myitems:${myItems}`,
+            ...(overrideSig ? [`ov:${overrideSig}`] : []),
         ].join("|");
     }
 };

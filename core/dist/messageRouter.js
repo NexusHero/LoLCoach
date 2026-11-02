@@ -21,23 +21,19 @@ const VALID_RISK_LEVELS = ["safe", "normal", "risky"];
 const VALID_BUILD_FOCUSES = ["auto", "burst", "dps", "bruiser", "split"];
 let MessageRouter = class MessageRouter {
     orchestrator;
-    // Dispatch table instead of an if-chain on message.event — adding a new
-    // event type means adding a map entry, not editing existing branches (OCP).
-    // Built in the constructor body (not as a field initializer): field
-    // initializers run in declaration order, and this one must run *after*
-    // the handler arrow-function fields below are assigned, not before.
     handlers;
-    // Explicit @inject (not reflected design:paramtypes) — see comment in
-    // orchestrator.ts: `tsx`/esbuild doesn't emit that metadata.
     constructor(orchestrator) {
         this.orchestrator = orchestrator;
         this.handlers = new Map([
+            ["SET_SUMMONE", this.handleSetSummoner],
             ["SET_SUMMONER", this.handleSetSummoner],
             ["TRIGGER_ANALYSIS", this.handleTriggerAnalysis],
             ["SET_LLM_PROVIDER", this.handleSetLlmProvider],
             ["SET_RISK_LEVEL", this.handleSetRiskLevel],
             ["SET_BUILD_FOCUS", this.handleSetBuildFocus],
             ["SET_PREFER_PASSIVE_ITEMS", this.handleSetPreferPassiveItems],
+            ["COACH_COMMAND", this.handleCoachCommand],
+            ["CLEAR_TACTICAL_OVERRIDE", this.handleClearTacticalOverride],
             ["GET_MODELS", this.handleGetModels],
             ["VALIDATE_KEY", this.handleValidateKey],
         ]);
@@ -82,6 +78,16 @@ let MessageRouter = class MessageRouter {
             this.orchestrator.setPreferPassiveItems(message.preferPassiveItems);
         }
     };
+    handleCoachCommand = async (_ws, message) => {
+        if (typeof message.text === "string" && message.text.trim().length > 0) {
+            await this.orchestrator.handleCoachCommand(message.text);
+        }
+    };
+    handleClearTacticalOverride = async (_ws, message) => {
+        if (typeof message.key === "string" && message.key.trim().length > 0) {
+            await this.orchestrator.handleClearOverride(message.key);
+        }
+    };
     handleGetModels = async (ws, message) => {
         const providerType = message.provider;
         const apiKey = message.apiKey;
@@ -123,15 +129,18 @@ let MessageRouter = class MessageRouter {
         if (!providerType || !apiKey) {
             logger_js_1.Logger.info("[MessageRouter] LLM provider disabled.");
             this.orchestrator.setLlmProvider(null);
+            this.orchestrator.setEmbeddingConfig?.({ provider: "none" });
             return;
         }
         try {
             const provider = await (0, llmProvider_js_1.createLlmProvider)(providerType, apiKey, model);
             this.orchestrator.setLlmProvider(provider);
+            this.orchestrator.setEmbeddingConfig?.({ provider: providerType, apiKey });
         }
         catch (err) {
             logger_js_1.Logger.error("[MessageRouter] Failed to create LLM provider:", err);
             this.orchestrator.setLlmProvider(null);
+            this.orchestrator.setEmbeddingConfig?.({ provider: "none" });
         }
     };
 };
