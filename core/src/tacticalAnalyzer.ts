@@ -22,7 +22,20 @@ import {
 export { PASSIVE_ITEM_ALTERNATIVES };
 export { computeNextBestBuy } from "./recipeSolver.js";
 
-export function findLaneOpponent(state: ParsedGameState, myPos: RolePosition): Player | undefined {
+function normalizeChamp(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+export function findLaneOpponent(
+  state: ParsedGameState,
+  myPos: RolePosition,
+  laneOpponentOverride?: string,
+): Player | undefined {
+  if (laneOpponentOverride && laneOpponentOverride.trim().length > 0) {
+    const target = normalizeChamp(laneOpponentOverride);
+    const matched = state.enemies.find((e) => normalizeChamp(e.championName).includes(target));
+    if (matched) return matched;
+  }
   if (myPos === "UNKNOWN" || myPos === "") return state.enemies[0];
   const exact = state.enemies.find((e) => e.position === myPos);
   if (exact) return exact;
@@ -71,9 +84,17 @@ export function computePrimaryThreat(state: ParsedGameState): {
   };
 }
 
-export function computeTeamDamageProfile(state: ParsedGameState) {
+export function computeTeamDamageProfile(
+  state: ParsedGameState,
+  enemyBuildOverrides: Record<string, "ad" | "ap" | "tank"> = {},
+) {
   if (state.enemies.length === 0) {
     return { adPercent: 50, apPercent: 50, heavyHealing: false, armorStacking: false, mrStacking: false };
+  }
+
+  const normalizedOverrides = new Map<string, "ad" | "ap" | "tank">();
+  for (const [k, v] of Object.entries(enemyBuildOverrides)) {
+    normalizedOverrides.set(normalizeChamp(k), v);
   }
 
   let adWeight = 0;
@@ -85,6 +106,7 @@ export function computeTeamDamageProfile(state: ParsedGameState) {
   for (const enemy of state.enemies) {
     const tags = ddragon.getChampionTags(enemy.championName);
     const threatMult = 1 + enemy.scores.kills * 0.15;
+    const override = normalizedOverrides.get(normalizeChamp(enemy.championName));
 
     let champAd = 0;
     let champAp = 0;
@@ -118,8 +140,16 @@ export function computeTeamDamageProfile(state: ParsedGameState) {
       if (HEALING_ITEM_IDS.has(item.itemID)) hasHealItem = true;
     }
 
-    // Dynamic hybrid/off-meta shift based on actual purchased items
-    if (itemAp >= 60 && itemAd === 0) {
+    if (override === "ap") {
+      champAd = 0.2;
+      champAp = 4.5 + itemAp / 35;
+    } else if (override === "ad") {
+      champAp = 0.2;
+      champAd = 4.5 + itemAd / 22;
+    } else if (override === "tank") {
+      hasArmor = true;
+      hasMr = true;
+    } else if (itemAp >= 60 && itemAd === 0) {
       champAd *= 0.25;
       champAp = Math.max(champAp, 2) + itemAp / 35;
     } else if (itemAd >= 40 && itemAp === 0) {
@@ -196,9 +226,10 @@ function computeOpponentSummonerSpells(
  */
 export async function computeEnemyCooldowns(
   state: ParsedGameState,
+  laneOpponentOverride?: string,
 ): Promise<EnemyCooldowns | undefined> {
   const myPos = (state.localPlayer.position || "UNKNOWN") as RolePosition;
-  const opp = findLaneOpponent(state, myPos);
+  const opp = findLaneOpponent(state, myPos, laneOpponentOverride);
   if (!opp) return undefined;
 
   const oppAbilities = await ddragon.getChampionAbilities(opp.championName);

@@ -1,6 +1,6 @@
+// ignore_for_file: lines_longer_than_80_chars
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:lol_coach/models/game_state.dart';
@@ -10,16 +10,8 @@ import 'package:lol_coach/models/tactical_insights.dart';
 import 'package:lol_coach/models/token_usage.dart';
 import 'package:lol_coach/models/ws_message.dart';
 import 'package:lol_coach/services/storage_service.dart';
+import 'package:lol_coach/services/voice_comms_helper.dart';
 import 'package:lol_coach/services/ws_client.dart';
-
-String? _loadCoreSecret() {
-  final home =
-      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
-  if (home == null) return null;
-  final file = File('$home/.lolcoach/.secret');
-  if (!file.existsSync()) return null;
-  return file.readAsStringSync().trim();
-}
 
 class CoachService extends ChangeNotifier {
   CoachService(this._client, [this._storage]) {
@@ -40,6 +32,7 @@ class CoachService extends ChangeNotifier {
   TacticalInsights? _tacticalInsights;
   PlayerHabitProfile? _playerProfile;
   PostGameAutopsy? _postGameAutopsy;
+  final List<CoachExchange> _coachHistory = [];
   String _lastEvent = '';
   bool _gameActive = false;
   bool _isAnalyzing = false;
@@ -68,6 +61,7 @@ class CoachService extends ChangeNotifier {
   String _buildFocus = 'auto';
   bool _preferPassiveItems = false;
   bool _proMode = false;
+  bool _voiceEnabled = false;
 
   ConnectionStatus get status => _client.status;
   String? get lastError => _client.lastError;
@@ -76,6 +70,10 @@ class CoachService extends ChangeNotifier {
   String get buildFocus => _buildFocus;
   bool get preferPassiveItems => _preferPassiveItems;
   bool get proMode => _proMode;
+  bool get voiceEnabled => _voiceEnabled;
+  List<CoachExchange> get coachHistory => List.unmodifiable(_coachHistory);
+  CoachExchange? get lastCoachExchange =>
+      _coachHistory.isNotEmpty ? _coachHistory.last : null;
 
   String? get lastLlmError => _lastLlmError;
   String get activeProviderType => _activeProviderType ?? 'none';
@@ -98,10 +96,6 @@ class CoachService extends ChangeNotifier {
   bool get isAnalyzing => _isAnalyzing;
   bool get llmFailed => _llmFailed;
   DateTime? get recommendationTime => _recommendationTime;
-
-  /// Raw game event that triggered the current recommendation
-  /// (e.g. PLAYER_DIED, HIGH_GOLD_REACHED, MANUAL). Null until the first
-  /// recommendation arrives.
   String? get triggerEvent => _triggerEvent;
 
   void connect(
@@ -130,16 +124,14 @@ class CoachService extends ChangeNotifier {
     _triggerEvent = null;
     _isBudgetExceeded = false;
 
-    final secret = _loadCoreSecret();
+    final secret = loadCoreSecret();
     final headers = secret != null ? {'Authorization': 'Bearer $secret'} : null;
     final uri = Uri.parse('ws://$host:$port');
 
     _client.connect(uri, headers: headers);
   }
 
-  void disconnect() {
-    _client.disconnect();
-  }
+  void disconnect() => _client.disconnect();
 
   void _onClientStatusChanged() {
     if (_client.status == ConnectionStatus.connected) {
@@ -149,32 +141,24 @@ class CoachService extends ChangeNotifier {
   }
 
   void _sendInitialSetup() {
-    _client.send(jsonEncode({
-      'event': 'SET_RISK_LEVEL',
-      'riskLevel': _riskLevel,
-    }),);
-
+    _client.send(jsonEncode({'event': 'SET_RISK_LEVEL', 'riskLevel': _riskLevel}));
     if (_buildFocus != 'auto') {
-      _client.send(jsonEncode({
-        'event': 'SET_BUILD_FOCUS',
-        'buildFocus': _buildFocus,
-      }),);
+      _client.send(
+        jsonEncode({'event': 'SET_BUILD_FOCUS', 'buildFocus': _buildFocus}),
+      );
     }
-
     if (_preferPassiveItems) {
       _client.send(jsonEncode({
         'event': 'SET_PREFER_PASSIVE_ITEMS',
         'preferPassiveItems': _preferPassiveItems,
       }),);
     }
-
     if (_activeSummonerName != null && _activeSummonerName!.isNotEmpty) {
       _client.send(jsonEncode({
         'event': 'SET_SUMMONER',
         'summonerName': _activeSummonerName,
       }),);
     }
-
     if (_activeProviderType != null &&
         _activeProviderType != 'none' &&
         _activeApiKey != null &&
@@ -195,9 +179,7 @@ class CoachService extends ChangeNotifier {
         'apiKey': _activeApiKey,
       }),);
     } else if (_activeProviderType == 'none') {
-      _client.send(jsonEncode({
-        'event': 'SET_LLM_PROVIDER',
-      }),);
+      _client.send(jsonEncode({'event': 'SET_LLM_PROVIDER'}));
     }
   }
 
@@ -209,36 +191,51 @@ class CoachService extends ChangeNotifier {
     _client.send(jsonEncode({'event': 'TRIGGER_ANALYSIS'}));
   }
 
-  /// Sets the coaching playstyle ('safe' | 'normal' | 'risky'). Persists the
-  /// choice and pushes it live so the next recommendation reflects it.
+  void sendCoachCommand(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty || !isConnected) return;
+    _client.send(jsonEncode({'event': 'COACH_COMMAND', 'text': trimmed}));
+  }
+
+  void clearTacticalOverride(String key) {
+    if (!isConnected) return;
+    _client.send(jsonEncode({'event': 'CLEAR_TACTICAL_OVERRIDE', 'key': key}));
+  }
+
+  void setVoiceEnabled({required bool enabled}) {
+    if (_voiceEnabled == enabled) return;
+    _voiceEnabled = enabled;
+    if (enabled) {
+      speakTacticalBriefing(
+        'Voice Coach active. Ready for callouts.',
+        enabled: true,
+      );
+    }
+    notifyListeners();
+  }
+
   void setRiskLevel(String level) {
     if (_riskLevel == level) return;
     _riskLevel = level;
     unawaited(_storage?.setRiskLevel(level));
     if (isConnected) {
-      _client.send(jsonEncode({
-        'event': 'SET_RISK_LEVEL',
-        'riskLevel': level,
-      }),);
+      _client.send(jsonEncode({'event': 'SET_RISK_LEVEL', 'riskLevel': level}));
     }
     notifyListeners();
   }
 
-  /// Sets the combat/build focus ('auto' | 'burst' | 'dps' | 'bruiser' | 'split').
   void setBuildFocus(String focus) {
     if (_buildFocus == focus) return;
     _buildFocus = focus;
     unawaited(_storage?.setBuildFocus(focus));
     if (isConnected) {
-      _client.send(jsonEncode({
-        'event': 'SET_BUILD_FOCUS',
-        'buildFocus': focus,
-      }),);
+      _client.send(
+        jsonEncode({'event': 'SET_BUILD_FOCUS', 'buildFocus': focus}),
+      );
     }
     notifyListeners();
   }
 
-  /// Toggles passive/stat-stick item preference over active items.
   void setPreferPassiveItems({required bool prefer}) {
     if (_preferPassiveItems == prefer) return;
     _preferPassiveItems = prefer;
@@ -252,7 +249,6 @@ class CoachService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Toggles Challenger Pro / Zen HUD mode.
   void setProMode({required bool enabled}) {
     if (_proMode == enabled) return;
     _proMode = enabled;
@@ -266,11 +262,9 @@ class CoachService extends ChangeNotifier {
     _availableModels = null;
     _availableModelsProvider = null;
     notifyListeners();
-    _client.send(jsonEncode({
-      'event': 'GET_MODELS',
-      'provider': provider,
-      'apiKey': apiKey,
-    }),);
+    _client.send(
+      jsonEncode({'event': 'GET_MODELS', 'provider': provider, 'apiKey': apiKey}),
+    );
   }
 
   void clearLlmError() {
@@ -299,20 +293,42 @@ class CoachService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _applyUiMutation(CoachUiMutation? mutation) {
+    if (mutation == null) return;
+    if (mutation.proMode != null) {
+      _proMode = mutation.proMode!;
+      unawaited(_storage?.setProMode(value: _proMode));
+    }
+    if (mutation.riskLevel != null) {
+      _riskLevel = mutation.riskLevel!;
+      unawaited(_storage?.setRiskLevel(_riskLevel));
+    }
+    if (mutation.buildFocus != null) {
+      _buildFocus = mutation.buildFocus!;
+      unawaited(_storage?.setBuildFocus(_buildFocus));
+    }
+    if (mutation.preferPassiveItems != null) {
+      _preferPassiveItems = mutation.preferPassiveItems!;
+      unawaited(_storage?.setPreferPassiveItems(value: _preferPassiveItems));
+    }
+  }
+
   void _onMessage(String raw) {
     try {
       final json = jsonDecode(raw) as Map<String, dynamic>;
       final msg = WsMessage.fromJson(json);
       _lastEvent = msg.event;
 
-      if (msg.tacticalInsights != null) {
-        _tacticalInsights = msg.tacticalInsights;
-      }
-      if (msg.playerProfile != null) {
-        _playerProfile = msg.playerProfile;
-      }
-      if (msg.postGameAutopsy != null) {
-        _postGameAutopsy = msg.postGameAutopsy;
+      if (msg.tacticalInsights != null) _tacticalInsights = msg.tacticalInsights;
+      if (msg.playerProfile != null) _playerProfile = msg.playerProfile;
+      if (msg.postGameAutopsy != null) _postGameAutopsy = msg.postGameAutopsy;
+      if (msg.coachExchange != null) {
+        _coachHistory.add(msg.coachExchange!);
+        _applyUiMutation(msg.coachExchange!.uiMutation);
+        speakTacticalBriefing(
+          msg.coachExchange!.replyText,
+          enabled: _voiceEnabled,
+        );
       }
 
       switch (msg.event) {
@@ -350,7 +366,6 @@ class CoachService extends ChangeNotifier {
           _availableModels = null;
           _availableModelsProvider = null;
           _isLoadingModels = false;
-          debugPrint('[CoachService] Models error: ${json["error"]}');
         case 'KEY_VALID':
           _isValidatingKey = false;
           _keyValidationResult = true;

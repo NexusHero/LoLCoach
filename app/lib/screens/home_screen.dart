@@ -130,6 +130,11 @@ class HomeScreen extends ConsumerWidget {
           onPreferPassiveChanged: (v) => ws.setPreferPassiveItems(prefer: v),
           proMode: ws.proMode,
           onProModeChanged: (v) => ws.setProMode(enabled: v),
+          onSendCoachCommand: ws.sendCoachCommand,
+          onClearOverride: ws.clearTacticalOverride,
+          lastCoachExchange: ws.lastCoachExchange,
+          voiceEnabled: ws.voiceEnabled,
+          onVoiceToggled: (v) => ws.setVoiceEnabled(enabled: v),
           onRefresh: ws.triggerAnalysis,
           aiEnabled: _isAiProvider(ws.activeProviderType),
         );

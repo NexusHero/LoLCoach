@@ -1,4 +1,7 @@
 // ignore_for_file: lines_longer_than_80_chars
+import 'package:lol_coach/models/tactical_command_models.dart';
+
+export 'package:lol_coach/models/tactical_command_models.dart';
 
 class NextBestBuy {
   const NextBestBuy({
@@ -192,6 +195,8 @@ class TacticalInsights {
     this.targetCsPerMin = 8,
     this.buildFocus = 'auto',
     this.preferPassiveItems = false,
+    this.liveOverrides,
+    this.lastCoachExchange,
   });
 
   factory TacticalInsights.fromJson(Map<String, dynamic> json) =>
@@ -224,6 +229,16 @@ class TacticalInsights {
         targetCsPerMin: (json['targetCsPerMin'] as num?)?.toDouble() ?? 8,
         buildFocus: json['buildFocus'] as String? ?? 'auto',
         preferPassiveItems: json['preferPassiveItems'] as bool? ?? false,
+        liveOverrides: json['liveOverrides'] != null
+            ? LiveTacticalOverrides.fromJson(
+                json['liveOverrides'] as Map<String, dynamic>,
+              )
+            : null,
+        lastCoachExchange: json['lastCoachExchange'] != null
+            ? CoachExchange.fromJson(
+                json['lastCoachExchange'] as Map<String, dynamic>,
+              )
+            : null,
       );
 
   final PrimaryThreat? primaryThreat;
@@ -236,6 +251,8 @@ class TacticalInsights {
   final double targetCsPerMin;
   final String buildFocus;
   final bool preferPassiveItems;
+  final LiveTacticalOverrides? liveOverrides;
+  final CoachExchange? lastCoachExchange;
 }
 
 class PostGameAutopsy {

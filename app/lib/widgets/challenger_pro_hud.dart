@@ -121,6 +121,8 @@ class ChallengerProHud extends StatelessWidget {
               ProCooldownCard(
                 cooldowns: cds,
                 counterPlay: counterPlay,
+                activeTimers:
+                    tacticalInsights?.liveOverrides?.activeTimers ?? const [],
               ),
             if (cds != null) const SizedBox(height: 14),
             if (tacticalInsights != null)

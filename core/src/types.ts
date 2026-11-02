@@ -228,6 +228,37 @@ export interface ObjectiveTimer {
   status: "alive" | "spawning_soon" | "countdown";
 }
 
+export interface ActiveSpellTimer {
+  key: string;
+  label: string;
+  championName: string;
+  remainingSeconds: number;
+  totalSeconds: number;
+  expiresAtGameTime: number;
+}
+
+export interface LiveTacticalOverrides {
+  laneOpponentOverride?: string;
+  campedStatus?: "normal" | "camped" | "weaksided";
+  enemyBuildOverrides: Record<string, "ad" | "ap" | "tank">;
+  tacticalNotes: string[];
+  activeTimers: ActiveSpellTimer[];
+}
+
+export interface CoachExchange {
+  id: string;
+  userText: string;
+  replyText: string;
+  actionsExecuted: string[];
+  uiMutation?: {
+    proMode?: boolean;
+    riskLevel?: RiskLevel;
+    buildFocus?: BuildFocus;
+    preferPassiveItems?: boolean;
+  };
+  timestamp: number;
+}
+
 export interface TacticalInsights {
   primaryThreat?: {
     championName: string;
@@ -251,6 +282,8 @@ export interface TacticalInsights {
   targetCsPerMin: number;
   buildFocus: BuildFocus;
   preferPassiveItems: boolean;
+  liveOverrides?: LiveTacticalOverrides;
+  lastCoachExchange?: CoachExchange;
 }
 
 export interface PostGameAutopsy {
@@ -291,6 +324,7 @@ export interface WsMessage {
   tacticalInsights?: TacticalInsights;
   playerProfile?: PlayerHabitProfile;
   postGameAutopsy?: PostGameAutopsy;
+  coachExchange?: CoachExchange;
   error?: string;
   correlationId?: string;
   /** Game event that triggered this recommendation (e.g. PLAYER_DIED). */

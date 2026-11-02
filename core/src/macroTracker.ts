@@ -118,6 +118,7 @@ export function computeMacroAlerts(
   state: ParsedGameState,
   objectives: ObjectiveTimer[],
   goldHoardingSeconds = 0,
+  campedStatus: "normal" | "camped" | "weaksided" = "normal",
 ): MacroAlert[] {
   const alerts: MacroAlert[] = [];
   const t = state.gameTime;
@@ -146,6 +147,17 @@ export function computeMacroAlerts(
       category: "danger",
       title: `PROTECT SHUTDOWN (${me.scores.kills}/${me.scores.deaths}/${me.scores.assists})`,
       detail: "High bounty on your head — avoid blind 1v2s and play on vision",
+    });
+  }
+
+  // Priority 1C: Active Camped / Weakside Override from Voice/Chat Coach
+  if (!me.isDead && (campedStatus === "camped" || campedStatus === "weaksided")) {
+    alerts.push({
+      id: "camped_protocol",
+      priority: "critical",
+      category: "danger",
+      title: campedStatus === "camped" ? "CAMPED PROTOCOL ACTIVE" : "WEAKSIDE PROTOCOL ACTIVE",
+      detail: "Freeze near tower, hold escape spell & buy defensive stats first",
     });
   }
 

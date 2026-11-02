@@ -3,17 +3,20 @@ import type {
   RolePosition,
   RiskLevel,
   BuildFocus,
+  LiveTacticalOverrides,
 } from "./types.js";
 import { DEFAULT_RISK_LEVEL, DEFAULT_BUILD_FOCUS } from "./types.js";
 import { getGamePhase } from "./stateMinifier.js";
 import { ddragon } from "./ddragonService.js";
-import { computePrimaryThreat, computeTeamDamageProfile } from "./tacticalAnalyzer.js";
+import { computePrimaryThreat, computeTeamDamageProfile, findLaneOpponent } from "./tacticalAnalyzer.js";
 import { computeObjectives } from "./macroTracker.js";
 
 export interface LlmContextOptions {
   buildFocus?: BuildFocus;
   preferPassiveItems?: boolean;
   habitWarnings?: string[];
+  liveOverrides?: LiveTacticalOverrides;
+  vectorMemories?: string[];
 }
 
 export const SYSTEM_PROMPT = `You are an experienced League of Legends coach giving live in-game advice.
@@ -137,7 +140,14 @@ async function formatAbilities(championName: string): Promise<string> {
   return ` | Abilities: Q=${abilities.q}, W=${abilities.w}, E=${abilities.e}, R=${abilities.r}`;
 }
 
-function findDirectLaneOpponent(state: ParsedGameState, myPos: RolePosition) {
+function findDirectLaneOpponent(
+  state: ParsedGameState,
+  myPos: RolePosition,
+  laneOpponentOverride?: string,
+) {
+  if (laneOpponentOverride && laneOpponentOverride.trim().length > 0) {
+    return findLaneOpponent(state, myPos, laneOpponentOverride);
+  }
   if (myPos === "UNKNOWN" || myPos === "") return undefined;
   const laneOpponent = state.enemies.find((e) => e.position === myPos);
   if (laneOpponent) return laneOpponent;
@@ -193,7 +203,8 @@ export async function buildUserPrompt(
   const myPos = (state.localPlayer.position || "UNKNOWN") as RolePosition;
   const myVision = state.localPlayer.scores.wardScore;
 
-  const primaryOpponent = findDirectLaneOpponent(state, myPos);
+  const overrides = options.liveOverrides;
+  const primaryOpponent = findDirectLaneOpponent(state, myPos, overrides?.laneOpponentOverride);
   const myTags = ddragon.getChampionTags(state.localPlayer.championName);
   const myTagStr = myTags.length ? ` [${myTags.join(", ")}]` : "";
   const mySpellStr = formatSpells(state.localPlayer);
@@ -210,7 +221,7 @@ export async function buildUserPrompt(
   const roleContext = buildRoleContext(state, myPos);
   const enemiesWithTags = formatEnemiesWithTags(state.enemies);
   const threat = computePrimaryThreat(state);
-  const dmgProfile = computeTeamDamageProfile(state);
+  const dmgProfile = computeTeamDamageProfile(state, overrides?.enemyBuildOverrides);
   const objectives = computeObjectives(state);
 
   const threatLine = threat
@@ -228,7 +239,28 @@ export async function buildUserPrompt(
       ? options.habitWarnings.join(" ")
       : "";
 
-  const extraLines = [threatLine, objLine, roleContext, focusLine, habitsLine]
+  const overrideParts: string[] = [];
+  if (overrides?.laneOpponentOverride) {
+    overrideParts.push(`Lane Swap Override: Player is laning directly vs ${overrides.laneOpponentOverride}`);
+  }
+  if (overrides?.campedStatus === "camped" || overrides?.campedStatus === "weaksided") {
+    overrideParts.push(`Jungle Pressure: Player is being ${overrides.campedStatus.toUpperCase()} — prioritize anti-dive survival & wave freeze`);
+  }
+  if (overrides?.enemyBuildOverrides && Object.keys(overrides.enemyBuildOverrides).length > 0) {
+    const entries = Object.entries(overrides.enemyBuildOverrides).map(([c, b]) => `${c}=${b.toUpperCase()}`);
+    overrideParts.push(`Enemy Build Overrides: ${entries.join(", ")}`);
+  }
+  if (overrides?.tacticalNotes && overrides.tacticalNotes.length > 0) {
+    overrideParts.push(`Player Live Callouts: ${overrides.tacticalNotes.join(" | ")}`);
+  }
+  const overridesLine = overrideParts.join(" | ");
+
+  const memoryLine =
+    options.vectorMemories && options.vectorMemories.length > 0
+      ? `Past Matchup Memory (Vector RAG): ${options.vectorMemories.join(" || ")}`
+      : "";
+
+  const extraLines = [threatLine, objLine, roleContext, focusLine, habitsLine, overridesLine, memoryLine]
     .filter((l) => l.length > 0)
     .join("\n");
 

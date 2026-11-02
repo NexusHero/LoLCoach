@@ -12,6 +12,7 @@ class WsMessage {
     this.tacticalInsights,
     this.playerProfile,
     this.postGameAutopsy,
+    this.coachExchange,
     this.error,
     this.tokenUsage,
     this.sessionInputTokens,
@@ -47,6 +48,11 @@ class WsMessage {
                 json['postGameAutopsy'] as Map<String, dynamic>,
               )
             : null,
+        coachExchange: json['coachExchange'] != null
+            ? CoachExchange.fromJson(
+                json['coachExchange'] as Map<String, dynamic>,
+              )
+            : null,
         error: json['error'] as String?,
         tokenUsage: json['tokenUsage'] != null
             ? TokenUsage.fromJson(json['tokenUsage'] as Map<String, dynamic>)
@@ -63,6 +69,7 @@ class WsMessage {
   final TacticalInsights? tacticalInsights;
   final PlayerHabitProfile? playerProfile;
   final PostGameAutopsy? postGameAutopsy;
+  final CoachExchange? coachExchange;
   final String? error;
   final TokenUsage? tokenUsage;
   final int? sessionInputTokens;

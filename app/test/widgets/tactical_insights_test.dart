@@ -9,6 +9,7 @@ import 'package:lol_coach/theme/app_theme.dart';
 import 'package:lol_coach/widgets/challenger_pro_hud.dart';
 import 'package:lol_coach/widgets/macro_alert_strip.dart';
 import 'package:lol_coach/widgets/recommendation_panel.dart';
+import 'package:lol_coach/widgets/tactical_comms_bar.dart';
 
 void main() {
   group('Challenger Coaching Engine HUD widgets', () {
@@ -266,6 +267,70 @@ void main() {
         expect(find.text('Punish Zed W (17s CD) after cast!'), findsOneWidget);
         expect(find.text('8.4 / 8.0'), findsOneWidget);
         expect(find.text('17s'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'TacticalCommsBar_RendersRadioReplyActiveChipsAndExecutes1ClickCallouts',
+      (tester) async {
+        final sentCommands = <String>[];
+        final clearedKeys = <String>[];
+
+        const insights = TacticalInsights(
+          teamDamageProfile: TeamDamageProfile(adPercent: 50, apPercent: 50),
+          enemyCooldowns: EnemyCooldowns(
+            championName: 'Ahri',
+            level: 8,
+            abilityHaste: 10,
+            q: 6,
+            w: 8,
+            e: 11,
+            r: 95,
+            keyThreatSummary: 'Punish Ahri E (11s CD) after cast!',
+          ),
+          liveOverrides: LiveTacticalOverrides(
+            laneOpponentOverride: 'Vayne',
+            campedStatus: 'camped',
+            enemyBuildOverrides: {'KaiSa': 'ap'},
+          ),
+          lastCoachExchange: CoachExchange(
+            id: 'cmd_1',
+            userText: 'Vayne ist Top und ich werde gecampt',
+            replyText: 'Anti-Camp aktiv: Freeze vor eigenem Turm gegen Vayne.',
+            actionsExecuted: ['🔄 Lane → Vayne', '⛺ Camped → Safe'],
+            timestamp: 1000,
+          ),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.dark,
+            home: Scaffold(
+              body: TacticalCommsBar(
+                tacticalInsights: insights,
+                onSendCommand: sentCommands.add,
+                onClearOverride: clearedKeys.add,
+              ),
+            ),
+          ),
+        );
+
+        expect(find.text('RACE ENGINEER RADIO'), findsOneWidget);
+        expect(
+          find.text('Anti-Camp aktiv: Freeze vor eigenem Turm gegen Vayne.'),
+          findsOneWidget,
+        );
+        expect(find.text('🔄 Lane vs Vayne'), findsOneWidget);
+
+        // 1-Click on Quick Callout Pill ("Vayne Flash") sends command
+        await tester.tap(find.text('Vayne Flash'));
+        await tester.pump();
+        expect(sentCommands, contains('Vayne Flash'));
+
+        // 1-Click on Active Override Chip removes override
+        await tester.tap(find.text('🔄 Lane vs Vayne'));
+        await tester.pump();
+        expect(clearedKeys, contains('laneOpponent'));
       },
     );
   });

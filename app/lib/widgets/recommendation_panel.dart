@@ -179,7 +179,12 @@ class _RecommendationPanelState extends State<RecommendationPanel>
           ],
           if (enemyCds != null) ...[
             const SizedBox(height: 12),
-            EnemyCooldownsStrip(cooldowns: enemyCds),
+            EnemyCooldownsStrip(
+              cooldowns: enemyCds,
+              activeTimers:
+                  widget.tacticalInsights?.liveOverrides?.activeTimers ??
+                      const [],
+            ),
           ],
           if (strategy?.laneMatchupAnalysis != null ||
               strategy?.counterPlay != null) ...[

@@ -16,10 +16,12 @@ class InteractiveCooldownGrid extends StatefulWidget {
     required this.cooldowns,
     super.key,
     this.compact = false,
+    this.activeTimers = const [],
   });
 
   final EnemyCooldowns cooldowns;
   final bool compact;
+  final List<ActiveSpellTimer> activeTimers;
 
   @override
   State<InteractiveCooldownGrid> createState() =>
@@ -31,12 +33,40 @@ class _InteractiveCooldownGridState extends State<InteractiveCooldownGrid> {
   Timer? _ticker;
 
   @override
+  void initState() {
+    super.initState();
+    _syncBackendTimers();
+  }
+
+  @override
   void didUpdateWidget(InteractiveCooldownGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.cooldowns.championName != widget.cooldowns.championName) {
       _remainingSeconds.clear();
       _stopTickerIfIdle();
     }
+    _syncBackendTimers();
+  }
+
+  void _syncBackendTimers() {
+    final champ = widget.cooldowns.championName.toLowerCase();
+    for (final t in widget.activeTimers) {
+      if (t.championName.toLowerCase() != champ || t.remainingSeconds <= 0) {
+        continue;
+      }
+      final labelUpper = t.label.toUpperCase();
+      if (['Q', 'W', 'E', 'R'].contains(labelUpper)) {
+        _remainingSeconds[labelUpper] = t.remainingSeconds;
+      } else {
+        final sumIdx = widget.cooldowns.summonerSpells.indexWhere(
+          (s) => s.name.toUpperCase() == labelUpper,
+        );
+        if (sumIdx >= 0) {
+          _remainingSeconds['SUM_$sumIdx'] = t.remainingSeconds;
+        }
+      }
+    }
+    _ensureTicker();
   }
 
   void _toggleTimer(String key, int maxSeconds) {
@@ -273,10 +303,12 @@ class ProCooldownCard extends StatelessWidget {
     required this.cooldowns,
     super.key,
     this.counterPlay,
+    this.activeTimers = const [],
   });
 
   final EnemyCooldowns cooldowns;
   final String? counterPlay;
+  final List<ActiveSpellTimer> activeTimers;
 
   @override
   Widget build(BuildContext context) {
@@ -311,7 +343,10 @@ class ProCooldownCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          InteractiveCooldownGrid(cooldowns: cooldowns),
+          InteractiveCooldownGrid(
+            cooldowns: cooldowns,
+            activeTimers: activeTimers,
+          ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(10),

@@ -206,9 +206,14 @@ class NextBestBuyBanner extends StatelessWidget {
 
 /// Key-Threat-Diff + Interactive 1-Click Q/W/E/R & Summoner Cooldown Bar.
 class EnemyCooldownsStrip extends StatelessWidget {
-  const EnemyCooldownsStrip({required this.cooldowns, super.key});
+  const EnemyCooldownsStrip({
+    required this.cooldowns,
+    super.key,
+    this.activeTimers = const [],
+  });
 
   final EnemyCooldowns cooldowns;
+  final List<ActiveSpellTimer> activeTimers;
 
   @override
   Widget build(BuildContext context) {
@@ -249,6 +254,7 @@ class EnemyCooldownsStrip extends StatelessWidget {
           InteractiveCooldownGrid(
             cooldowns: cooldowns,
             compact: true,
+            activeTimers: activeTimers,
           ),
         ],
       ),

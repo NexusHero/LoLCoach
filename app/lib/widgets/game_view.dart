@@ -13,6 +13,7 @@ import 'package:lol_coach/widgets/local_player_card.dart';
 import 'package:lol_coach/widgets/macro_alert_strip.dart';
 import 'package:lol_coach/widgets/recommendation_panel.dart';
 import 'package:lol_coach/widgets/scoreboard.dart';
+import 'package:lol_coach/widgets/tactical_comms_bar.dart';
 
 class GameView extends StatelessWidget {
   const GameView({
@@ -35,6 +36,11 @@ class GameView extends StatelessWidget {
     this.onPreferPassiveChanged,
     this.proMode = false,
     this.onProModeChanged,
+    this.onSendCoachCommand,
+    this.onClearOverride,
+    this.lastCoachExchange,
+    this.voiceEnabled = false,
+    this.onVoiceToggled,
     this.onRefresh,
     this.aiEnabled = true,
   });
@@ -56,6 +62,11 @@ class GameView extends StatelessWidget {
   final ValueChanged<bool>? onPreferPassiveChanged;
   final bool proMode;
   final ValueChanged<bool>? onProModeChanged;
+  final ValueChanged<String>? onSendCoachCommand;
+  final ValueChanged<String>? onClearOverride;
+  final CoachExchange? lastCoachExchange;
+  final bool voiceEnabled;
+  final ValueChanged<bool>? onVoiceToggled;
   final VoidCallback? onRefresh;
 
   /// Whether an AI provider is active. In Basic rules mode the bridge never
@@ -118,6 +129,18 @@ class GameView extends StatelessWidget {
               if (tacticalInsights != null) ...[
                 const SizedBox(height: 10),
                 MacroAlertStrip(insights: tacticalInsights!),
+              ],
+              if (onSendCoachCommand != null) ...[
+                const SizedBox(height: 10),
+                TacticalCommsBar(
+                  gameState: gameState,
+                  tacticalInsights: tacticalInsights,
+                  lastExchange: lastCoachExchange,
+                  onSendCommand: onSendCoachCommand!,
+                  onClearOverride: onClearOverride,
+                  voiceEnabled: voiceEnabled,
+                  onVoiceToggled: onVoiceToggled,
+                ),
               ],
               const SizedBox(height: 14),
               if (proMode)

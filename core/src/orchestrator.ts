@@ -9,6 +9,8 @@ import type {
   TacticalInsights,
   PostGameAutopsy,
   PlayerHabitProfile,
+  CoachExchange,
+  RolePosition,
 } from "./types.js";
 import { DEFAULT_BUILD_FOCUS } from "./types.js";
 import type { IEventDetector, IRecommendationEngine, IWsBroadcaster } from "./interfaces.js";
@@ -26,6 +28,7 @@ import {
   computeTeamDamageProfile,
   computeNextBestBuy,
   computeEnemyCooldowns,
+  findLaneOpponent,
 } from "./tacticalAnalyzer.js";
 import {
   computeObjectives,
@@ -33,6 +36,8 @@ import {
   findObjectiveSetupTrigger,
 } from "./macroTracker.js";
 import { PlayerProfileService } from "./playerProfileService.js";
+import { VectorMemoryService, type EmbeddingConfig } from "./vectorMemoryService.js";
+import { TacticalCommandService } from "./tacticalCommandService.js";
 
 export interface OrchestratorConfig {
   summonerName: string;
@@ -48,6 +53,8 @@ export class BridgeOrchestrator {
   private preferPassiveItems = false;
   private lastObjectiveTriggerKey = "";
   private readonly profileService = new PlayerProfileService();
+  private readonly vectorMemory = new VectorMemoryService();
+  private readonly commandService = new TacticalCommandService(this.vectorMemory);
 
   constructor(
     @inject(WS_BROADCASTER_TOKEN) private readonly wsServer: IWsBroadcaster,
@@ -62,17 +69,27 @@ export class BridgeOrchestrator {
       this.engine.setTokenBudget(this.config.tokenBudget);
     }
     this.profileService.load().catch(() => {});
+    this.vectorMemory.load().catch(() => {});
   }
 
   private async computeTacticalInsights(state: ParsedGameState): Promise<TacticalInsights> {
     const telemetry = this.profileService.observeTick(state);
+    const liveOverrides = this.commandService.getOverrides(state.gameTime);
+    const lastCoachExchange = this.commandService.getLastExchange();
     const objectives = computeObjectives(state);
-    const macroAlerts = computeMacroAlerts(state, objectives, telemetry.goldHoardingSeconds);
+    const macroAlerts = computeMacroAlerts(
+      state,
+      objectives,
+      telemetry.goldHoardingSeconds,
+      liveOverrides.campedStatus ?? "normal",
+    );
     const primaryThreat = computePrimaryThreat(state);
-    const teamDamageProfile = computeTeamDamageProfile(state);
+    const teamDamageProfile = computeTeamDamageProfile(state, liveOverrides.enemyBuildOverrides);
     const recommendedItems = this.engine.getLastRecommendedItems?.() ?? [];
     const nextBestBuy = computeNextBestBuy(state, recommendedItems, this.preferPassiveItems);
-    const enemyCooldowns = await computeEnemyCooldowns(state);
+    const enemyCooldowns = await computeEnemyCooldowns(state, liveOverrides.laneOpponentOverride);
+
+    this.engine.setLiveOverrides?.(liveOverrides);
 
     return {
       ...(primaryThreat ? { primaryThreat } : {}),
@@ -85,6 +102,8 @@ export class BridgeOrchestrator {
       targetCsPerMin: telemetry.targetCsPerMin,
       buildFocus: this.buildFocus,
       preferPassiveItems: this.preferPassiveItems,
+      liveOverrides,
+      ...(lastCoachExchange ? { lastCoachExchange } : {}),
     };
   }
 
@@ -102,6 +121,19 @@ export class BridgeOrchestrator {
 
     let insights = await this.computeTacticalInsights(state);
     const events = this.eventDetector.detect(state);
+
+    // Retrieve Vector RAG matchup memories when a match starts
+    if (events.some((e) => e.type === "GAME_STARTED")) {
+      const myPos = (state.localPlayer.position || "UNKNOWN") as RolePosition;
+      const opp = findLaneOpponent(state, myPos, insights.liveOverrides?.laneOpponentOverride);
+      const memories = await this.vectorMemory.searchRelevantMemories(
+        `${state.localPlayer.championName} vs ${opp?.championName ?? ""}`,
+        state.localPlayer.championName,
+        opp?.championName,
+        3,
+      );
+      this.engine.setVectorMemories?.(memories);
+    }
 
     // Check Objective T-60s Setup Window trigger
     const setupObj = findObjectiveSetupTrigger(insights.objectives);
@@ -184,6 +216,52 @@ export class BridgeOrchestrator {
     });
   }
 
+  async handleCoachCommand(text: string): Promise<CoachExchange> {
+    const { exchange, shouldReevaluate } = await this.commandService.executeCommand(
+      text,
+      this.lastState,
+      this.clock,
+    );
+
+    if (exchange.uiMutation) {
+      if (exchange.uiMutation.riskLevel) this.setRiskLevel(exchange.uiMutation.riskLevel);
+      if (exchange.uiMutation.buildFocus) this.setBuildFocus(exchange.uiMutation.buildFocus);
+      if (exchange.uiMutation.preferPassiveItems !== undefined) {
+        this.setPreferPassiveItems(exchange.uiMutation.preferPassiveItems);
+      }
+    }
+
+    const insights = this.lastState ? await this.computeTacticalInsights(this.lastState) : undefined;
+    this.wsServer.broadcast({
+      event: "COACH_COMMAND_RESULT",
+      timestamp: this.clock(),
+      ...(this.lastState ? { gameState: this.lastState } : {}),
+      ...(insights ? { tacticalInsights: insights } : {}),
+      coachExchange: exchange,
+    });
+
+    if (shouldReevaluate && this.lastState && insights) {
+      await this.sendRecommendation(this.lastState, "MANUAL", insights);
+    }
+
+    return exchange;
+  }
+
+  async handleClearOverride(key: string): Promise<void> {
+    const cleared = this.commandService.clearOverride(key);
+    if (!cleared) return;
+    if (this.lastState) {
+      const insights = await this.computeTacticalInsights(this.lastState);
+      this.wsServer.broadcast({
+        event: "GAME_TICK",
+        timestamp: this.clock(),
+        gameState: this.lastState,
+        tacticalInsights: insights,
+      });
+      await this.sendRecommendation(this.lastState, "MANUAL", insights);
+    }
+  }
+
   async triggerManualAnalysis(): Promise<void> {
     if (!this.lastState) {
       Logger.info("[Orchestrator] Manual analysis requested but no game state available.");
@@ -195,9 +273,18 @@ export class BridgeOrchestrator {
   }
 
   resetDetector(): PostGameAutopsy | undefined {
+    const prevState = this.lastState;
     const autopsy = this.profileService.finalizeMatch(this.clock());
+    if (autopsy) {
+      const myPos = (prevState?.localPlayer.position || "UNKNOWN") as RolePosition;
+      const opp = prevState
+        ? findLaneOpponent(prevState, myPos, this.commandService.getOverrides().laneOpponentOverride)
+        : undefined;
+      this.vectorMemory.storeAutopsy(autopsy, opp?.championName).catch(() => {});
+    }
     this.lastState = null;
     this.lastObjectiveTriggerKey = "";
+    this.commandService.resetMatch();
     this.eventDetector.reset();
     this.engine.reset();
     return autopsy;
@@ -205,6 +292,14 @@ export class BridgeOrchestrator {
 
   getPlayerProfile(): PlayerHabitProfile {
     return this.profileService.getProfile();
+  }
+
+  getVectorMemoryService(): VectorMemoryService {
+    return this.vectorMemory;
+  }
+
+  setEmbeddingConfig(config: EmbeddingConfig): void {
+    this.vectorMemory.setEmbeddingConfig(config);
   }
 
   setTokenBudget(budget: number): void {

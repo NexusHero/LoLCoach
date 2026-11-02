@@ -2,7 +2,6 @@ import type { WebSocket } from "ws";
 import { inject, singleton } from "tsyringe";
 import { BridgeOrchestrator } from "./orchestrator.js";
 import { Logger } from "./logger.js";
-import type { WsMessage } from "./types.js";
 
 import { createLlmProvider } from "./llmProvider.js";
 import type { ProviderType } from "./llmProvider.js";
@@ -15,23 +14,19 @@ type MessageHandler = (ws: WebSocket, message: Record<string, unknown>) => Promi
 
 @singleton()
 export class MessageRouter {
-  // Dispatch table instead of an if-chain on message.event — adding a new
-  // event type means adding a map entry, not editing existing branches (OCP).
-  // Built in the constructor body (not as a field initializer): field
-  // initializers run in declaration order, and this one must run *after*
-  // the handler arrow-function fields below are assigned, not before.
   private readonly handlers: ReadonlyMap<string, MessageHandler>;
 
-  // Explicit @inject (not reflected design:paramtypes) — see comment in
-  // orchestrator.ts: `tsx`/esbuild doesn't emit that metadata.
   constructor(@inject(BridgeOrchestrator) private readonly orchestrator: BridgeOrchestrator) {
     this.handlers = new Map([
+      ["SET_SUMMONE", this.handleSetSummoner],
       ["SET_SUMMONER", this.handleSetSummoner],
       ["TRIGGER_ANALYSIS", this.handleTriggerAnalysis],
       ["SET_LLM_PROVIDER", this.handleSetLlmProvider],
       ["SET_RISK_LEVEL", this.handleSetRiskLevel],
       ["SET_BUILD_FOCUS", this.handleSetBuildFocus],
       ["SET_PREFER_PASSIVE_ITEMS", this.handleSetPreferPassiveItems],
+      ["COACH_COMMAND", this.handleCoachCommand],
+      ["CLEAR_TACTICAL_OVERRIDE", this.handleClearTacticalOverride],
       ["GET_MODELS", this.handleGetModels],
       ["VALIDATE_KEY", this.handleValidateKey],
     ]);
@@ -78,6 +73,18 @@ export class MessageRouter {
   private handleSetPreferPassiveItems: MessageHandler = (_ws, message) => {
     if (typeof message.preferPassiveItems === "boolean") {
       this.orchestrator.setPreferPassiveItems(message.preferPassiveItems);
+    }
+  };
+
+  private handleCoachCommand: MessageHandler = async (_ws, message) => {
+    if (typeof message.text === "string" && message.text.trim().length > 0) {
+      await this.orchestrator.handleCoachCommand(message.text);
+    }
+  };
+
+  private handleClearTacticalOverride: MessageHandler = async (_ws, message) => {
+    if (typeof message.key === "string" && message.key.trim().length > 0) {
+      await this.orchestrator.handleClearOverride(message.key);
     }
   };
 
@@ -128,15 +135,18 @@ export class MessageRouter {
     if (!providerType || !apiKey) {
       Logger.info("[MessageRouter] LLM provider disabled.");
       this.orchestrator.setLlmProvider(null);
+      this.orchestrator.setEmbeddingConfig?.({ provider: "none" });
       return;
     }
 
     try {
       const provider = await createLlmProvider(providerType, apiKey, model);
       this.orchestrator.setLlmProvider(provider);
+      this.orchestrator.setEmbeddingConfig?.({ provider: providerType, apiKey });
     } catch (err) {
       Logger.error("[MessageRouter] Failed to create LLM provider:", err);
       this.orchestrator.setLlmProvider(null);
+      this.orchestrator.setEmbeddingConfig?.({ provider: "none" });
     }
   };
 }

@@ -38,6 +38,7 @@ export class CacheService {
     risk: RiskLevel = DEFAULT_RISK_LEVEL,
     buildFocus: BuildFocus = DEFAULT_BUILD_FOCUS,
     preferPassive = false,
+    overrideSig = "",
   ): string {
     const goldBucket = Math.floor(state.activePlayer.currentGold / 500);
     const phase = getGamePhase(state.gameTime);
@@ -63,6 +64,7 @@ export class CacheService {
       `e:${enemyNames}`,
       `eitems:${enemyCoreItems}`,
       `myitems:${myItems}`,
+      ...(overrideSig ? [`ov:${overrideSig}`] : []),
     ].join("|");
   }
 }

@@ -8,6 +8,7 @@ import type {
   RiskLevel,
   BuildFocus,
   RecommendedItem,
+  LiveTacticalOverrides,
 } from "./types.js";
 import { DEFAULT_RISK_LEVEL, DEFAULT_BUILD_FOCUS } from "./types.js";
 import type { IRecommendationEngine } from "./interfaces.js";
@@ -34,6 +35,8 @@ export class RecommendationEngine implements IRecommendationEngine {
   private buildFocus: BuildFocus = DEFAULT_BUILD_FOCUS;
   private preferPassiveItems = false;
   private habitWarnings: string[] = [];
+  private liveOverrides: LiveTacticalOverrides | undefined;
+  private vectorMemories: string[] = [];
   private lastRecommendedItems: RecommendedItem[] = [];
   private lastLlmGameTime = -999;
 
@@ -62,6 +65,14 @@ export class RecommendationEngine implements IRecommendationEngine {
     this.habitWarnings = warnings;
   }
 
+  setLiveOverrides(overrides: LiveTacticalOverrides): void {
+    this.liveOverrides = overrides;
+  }
+
+  setVectorMemories(memories: string[]): void {
+    this.vectorMemories = memories;
+  }
+
   getLastRecommendedItems(): RecommendedItem[] {
     return this.lastRecommendedItems;
   }
@@ -83,6 +94,8 @@ export class RecommendationEngine implements IRecommendationEngine {
     this.cache.clear();
     this.sessionInputTokens = 0;
     this.sessionOutputTokens = 0;
+    this.liveOverrides = undefined;
+    this.vectorMemories = [];
     this.lastRecommendedItems = [];
     this.lastLlmGameTime = -999;
   }
@@ -135,11 +148,28 @@ export class RecommendationEngine implements IRecommendationEngine {
       return;
     }
 
+    const hasOverrides =
+      this.liveOverrides !== undefined &&
+      (Boolean(this.liveOverrides.laneOpponentOverride) ||
+        Boolean(this.liveOverrides.campedStatus) ||
+        Object.keys(this.liveOverrides.enemyBuildOverrides).length > 0 ||
+        this.liveOverrides.tacticalNotes.length > 0);
+
+    const overrideSig = hasOverrides
+      ? JSON.stringify({
+          l: this.liveOverrides?.laneOpponentOverride,
+          c: this.liveOverrides?.campedStatus,
+          b: this.liveOverrides?.enemyBuildOverrides,
+          n: this.liveOverrides?.tacticalNotes,
+        })
+      : "";
+
     const cacheKey = this.cache.buildKey(
       state,
       this.riskLevel,
       this.buildFocus,
       this.preferPassiveItems,
+      overrideSig,
     );
     const cached = this.cache.get(cacheKey);
 
@@ -152,12 +182,16 @@ export class RecommendationEngine implements IRecommendationEngine {
         const hasExtraOptions =
           this.buildFocus !== DEFAULT_BUILD_FOCUS ||
           this.preferPassiveItems ||
-          this.habitWarnings.length > 0;
+          this.habitWarnings.length > 0 ||
+          hasOverrides ||
+          this.vectorMemories.length > 0;
         llmAnalysis = hasExtraOptions
           ? await this.llmProvider!.getAnalysis(state, this.riskLevel, {
               buildFocus: this.buildFocus,
               preferPassiveItems: this.preferPassiveItems,
               habitWarnings: this.habitWarnings,
+              ...(hasOverrides && this.liveOverrides ? { liveOverrides: this.liveOverrides } : {}),
+              ...(this.vectorMemories.length > 0 ? { vectorMemories: this.vectorMemories } : {}),
             })
           : await this.llmProvider!.getAnalysis(state, this.riskLevel);
         this.lastLlmGameTime = state.gameTime;

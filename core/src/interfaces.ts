@@ -5,6 +5,7 @@ import type {
   RiskLevel,
   BuildFocus,
   RecommendedItem,
+  LiveTacticalOverrides,
 } from "./types.js";
 import type { LlmProvider } from "./llmProvider.js";
 import type { RecommendationCallbacks } from "./recommendationEngine.js";
@@ -34,6 +35,8 @@ export interface IRecommendationEngine {
   setBuildFocus?(focus: BuildFocus): void;
   setPreferPassiveItems?(prefer: boolean): void;
   setHabitWarnings?(warnings: string[]): void;
+  setLiveOverrides?(overrides: LiveTacticalOverrides): void;
+  setVectorMemories?(memories: string[]): void;
   getLastRecommendedItems?(): RecommendedItem[];
   reset(): void;
   process(
