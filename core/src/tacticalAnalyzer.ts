@@ -20,7 +20,7 @@ import {
 } from "./tacticalCatalog.js";
 
 export { PASSIVE_ITEM_ALTERNATIVES };
-export { computeNextBestBuy } from "./recipeSolver.js";
+export { computeNextBestBuy, getDefaultTargetItems } from "./recipeSolver.js";
 
 function normalizeChamp(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");

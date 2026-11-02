@@ -49,6 +49,7 @@ Recommend items appropriate for the player's champion class:
 - Fighter/Bruiser: damage + survivability (Trinity Force=3078, Black Cleaver=3071, Sterak's=3053, Sundered Sky=6610, Maw=3156, Death's Dance=6333)
 - Support: utility, auras (Locket=3190, Moonstone=6617, Redemption=3107, Knight's Vow=3109)
 Common defensive counters: QSS=3140 (hard CC), Plated Steelcaps=3047 (AA-heavy), Merc Treads=3111 (CC+AP), Guardian Angel=3026 (burst assassins), GW items=3033/3165 (heavy healing).
+CHALLENGER COMPONENT RULE: Against heavy healing before 3 items, recommend sitting on 800g Grievous Wounds components (Executioner's Calling=3123, Oblivion Orb=3916, Bramble Vest=3076) or QSS=3140 instead of delaying core spikes by completing full Mortal Reminder/Morellonomicon/Thornmail early.
 Never repeat items already in the counter items list. Use [] only if the counter items already cover everything.
 
 The "Counter items" shown are automated heuristic suggestions. You may override itemReasoning if they don't fit the champion.
@@ -260,7 +261,22 @@ export async function buildUserPrompt(
       ? `Past Matchup Memory (Vector RAG): ${options.vectorMemories.join(" || ")}`
       : "";
 
-  const extraLines = [threatLine, objLine, roleContext, focusLine, habitsLine, overridesLine, memoryLine]
+  let levelSpikeLine = "";
+  if (primaryOpponent && myPos !== "JUNGLE") {
+    const myLvl = state.localPlayer.level;
+    const oppLvl = primaryOpponent.level;
+    if (myLvl === 5 && oppLvl >= 6) {
+      levelSpikeLine = `Level Spike Window: DANGER — ${primaryOpponent.championName} is Lvl ${oppLvl} (HAS ULTIMATE R) vs your Lvl 5 — respect all-in!`;
+    } else if (myLvl >= 6 && oppLvl === 5) {
+      levelSpikeLine = `Level Spike Window: ADVANTAGE — You are Lvl ${myLvl} (HAVE R) vs Lvl 5 ${primaryOpponent.championName} (NO R) — force trade/all-in now!`;
+    } else if (myLvl === 5 && oppLvl === 5) {
+      levelSpikeLine = `Level Spike Window: Both Lvl 5 — contest next wave to hit Level 6 Ultimate first!`;
+    } else if (state.gameTime < 210 && myLvl === 1 && oppLvl === 1) {
+      levelSpikeLine = `Level Spike Window: Lvl 1 race — thin wave to hit Level 2 (7th minion solo / 9th duo) first!`;
+    }
+  }
+
+  const extraLines = [threatLine, objLine, levelSpikeLine, roleContext, focusLine, habitsLine, overridesLine, memoryLine]
     .filter((l) => l.length > 0)
     .join("\n");
 

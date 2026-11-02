@@ -326,6 +326,8 @@ void main() {
         await tester.tap(find.text('Vayne Flash'));
         await tester.pump();
         expect(sentCommands, contains('Vayne Flash'));
+        expect(find.text('[F1]'), findsOneWidget);
+        expect(find.text('[F2]'), findsOneWidget);
 
         // 1-Click on Active Override Chip removes override
         await tester.tap(find.text('🔄 Lane vs Vayne'));

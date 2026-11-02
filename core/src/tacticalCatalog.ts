@@ -91,11 +91,15 @@ export const FALLBACK_ITEM_RECIPES: Record<number, { totalGold: number; from: nu
   3111: { totalGold: 1300, from: [1001, 1033] }, // Mercury's Treads
   3135: { totalGold: 3000, from: [1026, 1052] }, // Void Staff
   3139: { totalGold: 3200, from: [3140, 1037] }, // Mercurial Scimitar
+  3142: { totalGold: 2800, from: [3134, 1036] }, // Youmuu's Ghostblade
   3143: { totalGold: 2700, from: [3082, 1028] }, // Randuin's Omen
   3156: { totalGold: 3100, from: [3133, 1033] }, // Maw of Malmortius
   3157: { totalGold: 3250, from: [1058, 1031] }, // Zhonya's Hourglass
   3165: { totalGold: 2200, from: [3916, 1026] }, // Morellonomicon
+  3190: { totalGold: 2200, from: [1028, 1029, 1033] }, // Locket of the Iron Solari
+  2504: { totalGold: 2900, from: [3211, 1057] }, // Kaenic Rookern
   4401: { totalGold: 2800, from: [1057, 1028] }, // Force of Nature
+  6653: { totalGold: 3000, from: [2508, 1026] }, // Liandry's Torment
   6672: { totalGold: 3100, from: [3051, 1036] }, // Kraken Slayer
   6675: { totalGold: 3200, from: [3145, 1058] }, // Shadowflame
 };
@@ -107,6 +111,7 @@ export const HEALING_CHAMPIONS = new Set([
 ]);
 
 export const HEALING_ITEM_IDS = new Set([3072, 3153, 3065, 3074, 6692, 2502, 6610, 6617, 3107]);
+export const GRIEVOUS_WOUNDS_ITEM_IDS = new Set([3123, 3916, 3076, 3033, 3165, 3075, 6609]);
 export const ARMOR_ITEM_IDS = new Set([3047, 3075, 3143, 3110, 3068, 3157, 6333, 3742, 3076, 3082, 1031]);
 export const MR_ITEM_IDS = new Set([3111, 2504, 4401, 3065, 3156, 3091, 3102, 3211, 1057]);
 

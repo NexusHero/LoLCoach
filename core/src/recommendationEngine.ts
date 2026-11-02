@@ -123,7 +123,15 @@ export class RecommendationEngine implements IRecommendationEngine {
     }
 
     if (eventType === "ITEM_PURCHASED") {
-      return state.enemies.some((e) => e.items.some((i) => i.price >= 2600));
+      const enemyMajorSpike = state.enemies.some((e) =>
+        e.items.some((i) => i.price >= 2600),
+      );
+      const localCompletedSpike = state.localPlayer.items.some(
+        (i) =>
+          i.price >= 2200 ||
+          this.lastRecommendedItems.some((rec) => rec.id === i.itemID),
+      );
+      return enemyMajorSpike || localCompletedSpike;
     }
 
     return false;

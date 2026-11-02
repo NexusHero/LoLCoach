@@ -65,6 +65,22 @@ describe("macroTracker", () => {
       expect(alerts[0].category).toBe("objective");
       expect(alerts[1].category).toBe("economy");
     });
+
+    it("computeMacroAlerts_LaneOpponentHitsLevel6WhilePlayerIsLevel5_EmitsCriticalLevel6Alert", () => {
+      const state = makeGameState({
+        gameTime: 350,
+        localPlayer: makePlayer({ championName: "Ahri", position: "MIDDLE", level: 5 }),
+        enemies: [
+          makePlayer({ championName: "Zed", position: "MIDDLE", team: "CHAOS", level: 6 }),
+        ],
+      });
+      const objectives = computeObjectives(state);
+
+      const alerts = computeMacroAlerts(state, objectives);
+
+      expect(alerts.some((a) => a.id === "level_6_disadvantage")).toBe(true);
+      expect(alerts[0].title).toContain("ZED HAS R");
+    });
   });
 
   describe("findObjectiveSetupTrigger", () => {

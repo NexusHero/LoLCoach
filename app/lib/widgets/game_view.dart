@@ -1,5 +1,6 @@
 // ignore_for_file: lines_longer_than_80_chars
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lol_coach/models/game_state.dart';
 import 'package:lol_coach/models/recommendation.dart';
 import 'package:lol_coach/models/tactical_insights.dart';
@@ -77,6 +78,8 @@ class GameView extends StatelessWidget {
   /// The enemy laner sharing the local player's position, surfaced as the
   /// "vs <champion>" matchup chip on the recommendation hero.
   String? get _laneOpponent {
+    final ov = tacticalInsights?.liveOverrides?.laneOpponentOverride;
+    if (ov != null && ov.isNotEmpty) return ov;
     final pos = gameState.localPlayer.position.toLowerCase();
     if (pos.isEmpty) return null;
     for (final e in gameState.enemies) {
@@ -85,6 +88,37 @@ class GameView extends StatelessWidget {
       }
     }
     return null;
+  }
+
+  Map<ShortcutActivator, VoidCallback> _buildHotkeys() {
+    final opp = _laneOpponent ??
+        tacticalInsights?.enemyCooldowns?.championName ??
+        (gameState.enemies.isNotEmpty
+            ? gameState.enemies.first.championName
+            : 'Enemy');
+    final enemies = gameState.enemies;
+    String? swapTarget;
+    if (enemies.length >= 2) {
+      final idx = enemies.indexWhere((e) => e.championName == opp);
+      swapTarget = enemies[(idx + 1) % enemies.length].championName;
+    }
+
+    return <ShortcutActivator, VoidCallback>{
+      if (onSendCoachCommand != null) ...{
+        const SingleActivator(LogicalKeyboardKey.f1): () =>
+            onSendCoachCommand!('$opp Flash'),
+        const SingleActivator(LogicalKeyboardKey.f2): () =>
+            onSendCoachCommand!('$opp R'),
+        const SingleActivator(LogicalKeyboardKey.f3): () =>
+            onSendCoachCommand!('Ich werde gecampt'),
+        if (swapTarget != null)
+          const SingleActivator(LogicalKeyboardKey.f4): () =>
+              onSendCoachCommand!('Swap $swapTarget'),
+      },
+      if (onProModeChanged != null)
+        const SingleActivator(LogicalKeyboardKey.f5): () =>
+            onProModeChanged!(!proMode),
+    };
   }
 
   Widget _buildHeroSection() {
@@ -108,11 +142,15 @@ class GameView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 780;
+    return CallbackShortcuts(
+      bindings: _buildHotkeys(),
+      child: Focus(
+        autofocus: true,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 780;
 
-        return SingleChildScrollView(
+            return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -211,7 +249,9 @@ class GameView extends StatelessWidget {
             ],
           ),
         );
-      },
+          },
+        ),
+      ),
     );
   }
 }

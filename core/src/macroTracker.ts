@@ -161,6 +161,20 @@ export function computeMacroAlerts(
     });
   }
 
+  // Priority 1D: Level 6 Ultimate Spike Disadvantage vs Lane Opponent
+  if (!me.isDead && me.position && me.position !== "UNKNOWN" && me.position !== "JUNGLE") {
+    const laneOpp = state.enemies.find((e) => e.position === me.position && !e.isDead);
+    if (laneOpp && laneOpp.level >= 6 && me.level === 5) {
+      alerts.push({
+        id: "level_6_disadvantage",
+        priority: "critical",
+        category: "danger",
+        title: `LVL 6 DANGER: ${laneOpp.championName.toUpperCase()} HAS R (YOU: LVL 5)`,
+        detail: `Respect ${laneOpp.championName} ultimate all-in — concede wave until you hit Level 6`,
+      });
+    }
+  }
+
   // Priority 2: Objective T-60s Setup / Reset Window
   const upcomingObj = objectives.find(
     (o) => o.secondsUntilSpawn >= 35 && o.secondsUntilSpawn <= 75,

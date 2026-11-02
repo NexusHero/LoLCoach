@@ -53,7 +53,8 @@ class StorageService {
       _prefs.setBool('preferPassiveItems', value);
 
   /// Challenger Pro / Zen HUD mode (hides redundant native LoL HUD stats).
-  bool get proMode => _prefs.getBool('proMode') ?? false;
+  /// Enabled by default for High-Elo / Challenger 0.2s-glance workflow.
+  bool get proMode => _prefs.getBool('proMode') ?? true;
   Future<void> setProMode({required bool value}) =>
       _prefs.setBool('proMode', value);
 

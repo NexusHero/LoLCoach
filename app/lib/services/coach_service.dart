@@ -18,7 +18,7 @@ class CoachService extends ChangeNotifier {
     _riskLevel = _storage?.riskLevel ?? 'normal';
     _buildFocus = _storage?.buildFocus ?? 'auto';
     _preferPassiveItems = _storage?.preferPassiveItems ?? false;
-    _proMode = _storage?.proMode ?? false;
+    _proMode = _storage?.proMode ?? true;
     _client.addListener(_onClientStatusChanged);
     _subscription = _client.messages.listen(_onMessage);
   }
@@ -60,7 +60,7 @@ class CoachService extends ChangeNotifier {
   String _riskLevel = 'normal';
   String _buildFocus = 'auto';
   bool _preferPassiveItems = false;
-  bool _proMode = false;
+  bool _proMode = true;
   bool _voiceEnabled = false;
 
   ConnectionStatus get status => _client.status;

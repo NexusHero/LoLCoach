@@ -165,6 +165,37 @@ describe("tacticalAnalyzer", () => {
       expect(nextBuy?.itemName).toBe("Ruby Crystal");
       expect(nextBuy?.price).toBe(400);
     });
+
+    it("computeNextBestBuy_FullGrievousWoundsRecommendedBeforeTwoItems_SitsOn800gComponentFirst", () => {
+      const state = makeGameState({
+        activePlayer: makeActivePlayer({ currentGold: 1100 }),
+        localPlayer: makePlayer({ items: [] }),
+      });
+
+      const nextBuy = computeNextBestBuy(state, [
+        { id: 6672, name: "Kraken Slayer", reason: "Core ADC spike", priority: "core" },
+        { id: 3033, name: "Mortal Reminder", reason: "Anti-heal vs Aatrox", priority: "situational" },
+      ]);
+
+      expect(nextBuy).toBeDefined();
+      expect(nextBuy?.itemId).toBe(3123);
+      expect(nextBuy?.itemName).toBe("Executioner's Calling");
+      expect(nextBuy?.price).toBe(800);
+      expect(nextBuy?.breakpointHint).toContain("Sit on 800g Anti-Heal");
+    });
+
+    it("computeNextBestBuy_ColdStartSupportRole_UsesLocketTargetInsteadOfBruiserDefault", () => {
+      const state = makeGameState({
+        activePlayer: makeActivePlayer({ currentGold: 2300 }),
+        localPlayer: makePlayer({ championName: "Leona", position: "UTILITY", items: [] }),
+      });
+
+      const nextBuy = computeNextBestBuy(state, []);
+
+      expect(nextBuy).toBeDefined();
+      expect(nextBuy?.itemId).toBe(3190);
+      expect(nextBuy?.itemName).toBe("Locket of the Iron Solari");
+    });
   });
 
   describe("computeEnemyCooldowns", () => {

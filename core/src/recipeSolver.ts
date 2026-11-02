@@ -8,7 +8,14 @@ import {
   type ComponentRecipe,
   COMPONENT_CATALOG,
   FALLBACK_ITEM_RECIPES,
+  GRIEVOUS_WOUNDS_ITEM_IDS,
 } from "./tacticalCatalog.js";
+
+const FULL_GW_TO_COMPONENT: Record<number, ComponentRecipe> = {
+  3033: COMPONENT_CATALOG[3123], // Mortal Reminder -> Executioner's Calling (800g)
+  3165: COMPONENT_CATALOG[3916], // Morellonomicon -> Oblivion Orb (800g)
+  3075: COMPONENT_CATALOG[3076], // Thornmail -> Bramble Vest (800g)
+};
 
 function getItemMeta(itemId: number): { name: string; totalGold: number; from: number[] } {
   const dd = ddragon.getItemInfo(itemId);
@@ -85,19 +92,35 @@ function resolveRecipeNode(
   };
 }
 
-function getDefaultTargetItems(state: ParsedGameState, preferPassive = false): RecommendedItem[] {
+export function getDefaultTargetItems(state: ParsedGameState, preferPassive = false): RecommendedItem[] {
+  const pos = (state.localPlayer.position || "").toUpperCase();
+  const tags = ddragon.getChampionTags(state.localPlayer.championName);
   const stats = state.activePlayer.championStats;
-  if (stats.abilityPower > stats.attackDamage) {
+
+  if (pos === "UTILITY" || (tags.includes("Support") && !tags.includes("Mage"))) {
+    return [{ id: 3190, name: "Locket of the Iron Solari", reason: "Core support teamfight shield", priority: "core" }];
+  }
+  if (tags.includes("Tank") && !tags.includes("Fighter")) {
+    return [{ id: 3068, name: "Sunfire Aegis", reason: "Core tank waveclear & armor spike", priority: "core" }];
+  }
+  if (tags.includes("Marksman") || (pos === "BOTTOM" && stats.attackDamage >= stats.abilityPower)) {
+    return [{ id: 6672, name: "Kraken Slayer", reason: "Core ADC sustained DPS spike", priority: "core" }];
+  }
+  if (stats.abilityPower > stats.attackDamage || tags.includes("Mage")) {
     if (preferPassive) {
       return [{ id: 3102, name: "Banshee's Veil", reason: "Passive AP spell-shield", priority: "core" }];
     }
     return [{ id: 3157, name: "Zhonya's Hourglass", reason: "Core AP survival", priority: "core" }];
   }
+  if (tags.includes("Assassin")) {
+    return [{ id: 3142, name: "Youmuu's Ghostblade", reason: "Core lethality roam & burst spike", priority: "core" }];
+  }
   return [{ id: 3078, name: "Trinity Force", reason: "Core AD spike", priority: "core" }];
 }
 
 /**
- * Recursive Smart Single-Best-Buy + Breakpoint-Hint calculator with Multiset Inventory.
+ * Recursive Smart Single-Best-Buy + Breakpoint-Hint calculator with Multiset Inventory
+ * and Challenger 800g Anti-Heal Component-Sitting Rule.
  */
 export function computeNextBestBuy(
   state: ParsedGameState,
@@ -113,6 +136,25 @@ export function computeNextBestBuy(
     recommendedItems.length > 0
       ? recommendedItems.filter((i) => !ownedIds.has(i.id))
       : getDefaultTargetItems(state, preferPassiveItems).filter((i) => !ownedIds.has(i.id));
+
+  // Challenger 800g Anti-Heal Component-Sitting Rule:
+  // If any recommended item is a completed Grievous Wounds item (3033/3165/3075)
+  // before 2 completed items, sit on the 800g component (3123/3916/3076) first!
+  const completedCount = state.localPlayer.items.filter((i) => !i.consumable && i.price >= 2200).length;
+  const hasAnyGw = state.localPlayer.items.some((i) => GRIEVOUS_WOUNDS_ITEM_IDS.has(i.itemID));
+  const gwTarget = candidates.find((c) => FULL_GW_TO_COMPONENT[c.id] !== undefined);
+  if (gwTarget && !hasAnyGw && completedCount < 2 && openSlots > 0 && gold >= 800) {
+    const comp = FULL_GW_TO_COMPONENT[gwTarget.id];
+    const primaryCore = candidates.find((c) => c.id !== gwTarget.id) ?? gwTarget;
+    return {
+      itemId: comp.id,
+      itemName: comp.name,
+      price: comp.price,
+      targetItemId: primaryCore.id,
+      targetItemName: primaryCore.name,
+      breakpointHint: `Sit on 800g Anti-Heal → then finish ${primaryCore.name}`,
+    };
+  }
 
   const target = candidates[0];
   if (!target) return undefined;

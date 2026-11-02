@@ -109,18 +109,21 @@ class _TacticalCommsBarState extends State<TacticalCommsBar> {
               _QuickCalloutPill(
                 icon: Icons.flash_on_rounded,
                 label: '$opp Flash',
+                hotkey: 'F1',
                 accent: colors.gold,
                 onTap: () => widget.onSendCommand('$opp Flash'),
               ),
               _QuickCalloutPill(
                 icon: Icons.bolt_rounded,
                 label: '$opp Ult',
+                hotkey: 'F2',
                 accent: colors.cyan,
                 onTap: () => widget.onSendCommand('$opp R'),
               ),
               _QuickCalloutPill(
                 icon: Icons.shield_outlined,
                 label: 'Camped',
+                hotkey: 'F3',
                 accent: colors.errorLight,
                 onTap: () => widget.onSendCommand('Ich werde gecampt'),
               ),
@@ -128,6 +131,7 @@ class _TacticalCommsBarState extends State<TacticalCommsBar> {
                 _QuickCalloutPill(
                   icon: Icons.swap_horiz_rounded,
                   label: 'Swap → $swapTarget',
+                  hotkey: 'F4',
                   accent: colors.magic,
                   onTap: () => widget.onSendCommand('Swap $swapTarget'),
                 ),
@@ -219,25 +223,13 @@ class _RadioReplyBanner extends StatelessWidget {
             children: [
               Icon(Icons.headset_mic_rounded, size: 14, color: colors.magic),
               const SizedBox(width: 6),
-              Text(
-                'RACE ENGINEER RADIO',
-                style: AppTextStyles.micro.copyWith(
-                  color: colors.magic,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              Text('RACE ENGINEER RADIO', style: AppTextStyles.micro.copyWith(color: colors.magic, fontWeight: FontWeight.w800)),
               const Spacer(),
-              Text(
-                '"${exchange.userText}"',
-                style: AppTextStyles.micro.copyWith(color: colors.textDisabled),
-              ),
+              Text('"${exchange.userText}"', style: AppTextStyles.micro.copyWith(color: colors.textDisabled)),
             ],
           ),
           const SizedBox(height: 5),
-          Text(
-            exchange.replyText,
-            style: AppTextStyles.bodyBold.copyWith(color: colors.textPrimary),
-          ),
+          Text(exchange.replyText, style: AppTextStyles.bodyBold.copyWith(color: colors.textPrimary)),
           if (exchange.actionsExecuted.isNotEmpty) ...[
             const SizedBox(height: 6),
             Wrap(
@@ -246,24 +238,13 @@ class _RadioReplyBanner extends StatelessWidget {
               children: [
                 for (final act in exchange.actionsExecuted)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: colors.cyan.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: colors.cyan.withValues(alpha: 0.4),
-                      ),
+                      border: Border.all(color: colors.cyan.withValues(alpha: 0.4)),
                     ),
-                    child: Text(
-                      act,
-                      style: AppTextStyles.micro.copyWith(
-                        color: colors.cyan,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    child: Text(act, style: AppTextStyles.micro.copyWith(color: colors.cyan, fontWeight: FontWeight.w700)),
                   ),
               ],
             ),
@@ -356,12 +337,14 @@ class _QuickCalloutPill extends StatelessWidget {
     required this.label,
     required this.accent,
     required this.onTap,
+    this.hotkey,
   });
 
   final IconData icon;
   final String label;
   final Color accent;
   final VoidCallback onTap;
+  final String? hotkey;
 
   @override
   Widget build(BuildContext context) {
@@ -389,6 +372,10 @@ class _QuickCalloutPill extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              if (hotkey != null) ...[
+                const SizedBox(width: 4),
+                Text('[$hotkey]', style: AppTextStyles.micro.copyWith(color: colors.textDisabled, fontSize: 9)),
+              ],
             ],
           ),
         ),
