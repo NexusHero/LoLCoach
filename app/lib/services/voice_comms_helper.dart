@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 String? loadCoreSecret() {
+  if (kIsWeb) return null;
   final home =
       Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
   if (home == null) return null;
@@ -13,7 +16,7 @@ String? loadCoreSecret() {
 /// Speaks a short F1-Race-Engineer tactical callout via native OS TTS
 /// (macOS `say` / Windows SAPI) without external native plugin dependencies.
 void speakTacticalBriefing(String text, {required bool enabled}) {
-  if (!enabled || text.trim().isEmpty) return;
+  if (kIsWeb || !enabled || text.trim().isEmpty) return;
   if (Platform.environment.containsKey('FLUTTER_TEST')) return;
 
   final sanitized = text.replaceAll(RegExp('["\'`\\\\]'), '').trim();

@@ -12,8 +12,13 @@ typedef WebSocketChannelFactory = WebSocketChannel Function(
 WebSocketChannel _defaultChannelFactory(
   Uri uri, {
   Map<String, dynamic>? headers,
-}) =>
-    IOWebSocketChannel.connect(uri, headers: headers);
+}) {
+  if (kIsWeb) {
+    final targetUri = uri.port == 8765 ? uri.replace(port: 8080) : uri;
+    return WebSocketChannel.connect(targetUri);
+  }
+  return IOWebSocketChannel.connect(uri, headers: headers);
+}
 
 enum ConnectionStatus { disconnected, connecting, connected, error }
 

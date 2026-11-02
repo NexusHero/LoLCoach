@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lol_coach/controllers/theme_controller.dart';
@@ -19,7 +20,7 @@ void main() async {
   unawaited(initDDragonVersion());
 
   // Auto-start core on Desktop platforms if it exists
-  if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+  if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
     final exeDir = File(Platform.resolvedExecutable).parent.path;
     final coreName = Platform.isWindows ? 'core.exe' : 'core';
     final corePath = '$exeDir${Platform.pathSeparator}$coreName';
