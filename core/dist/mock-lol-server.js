@@ -50,6 +50,10 @@ function player(summonerName, championName, team, overrides = {}) {
         scores: { assists: 0, creepScore: 45, deaths: 0, kills: 1, wardScore: 5 },
         skinID: 0,
         summonerName,
+        summonerSpells: {
+            summonerSpellOne: { displayName: "Flash" },
+            summonerSpellTwo: { displayName: team === "CHAOS" ? "Ignite" : "Teleport" },
+        },
         team,
         ...overrides,
     };

@@ -44,5 +44,6 @@ export function parseGameState(
     allies,
     enemies,
     activePlayer: raw.activePlayer,
+    ...(raw.events?.Events ? { mapEvents: raw.events.Events } : {}),
   });
 }

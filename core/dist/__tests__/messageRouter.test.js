@@ -16,6 +16,7 @@ function makeOrchestrator() {
         triggerManualAnalysis: jest.fn().mockResolvedValue(undefined),
         setLlmProvider: jest.fn(),
         setTokenBudget: jest.fn(),
+        setRiskLevel: jest.fn(),
     };
 }
 function makeWs() {
@@ -184,6 +185,20 @@ describe("MessageRouter", () => {
             await router.handle(ws, { event: "VALIDATE_KEY", apiKey: "sk-key" });
             const sent = JSON.parse(ws.send.mock.calls[0][0]);
             expect(sent.event).toBe("KEY_INVALID");
+        });
+    });
+    describe("handle — SET_RISK_LEVEL", () => {
+        it("handle_SetRiskLevelWithValidLevel_CallsSetRiskLevel", async () => {
+            const orchestrator = makeOrchestrator();
+            const router = new messageRouter_1.MessageRouter(orchestrator);
+            await router.handle(fakeWs, { event: "SET_RISK_LEVEL", riskLevel: "risky" });
+            expect(orchestrator.setRiskLevel).toHaveBeenCalledWith("risky");
+        });
+        it("handle_SetRiskLevelWithInvalidLevel_DoesNotCallSetRiskLevel", async () => {
+            const orchestrator = makeOrchestrator();
+            const router = new messageRouter_1.MessageRouter(orchestrator);
+            await router.handle(fakeWs, { event: "SET_RISK_LEVEL", riskLevel: "yolo" });
+            expect(orchestrator.setRiskLevel).not.toHaveBeenCalled();
         });
     });
     describe("handle — unknown event", () => {

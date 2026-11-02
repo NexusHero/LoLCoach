@@ -6,9 +6,10 @@ import type { WsMessage } from "./types.js";
 
 import { createLlmProvider } from "./llmProvider.js";
 import type { ProviderType } from "./llmProvider.js";
-import type { RiskLevel } from "./types.js";
+import type { RiskLevel, BuildFocus } from "./types.js";
 
 const VALID_RISK_LEVELS: readonly RiskLevel[] = ["safe", "normal", "risky"];
+const VALID_BUILD_FOCUSES: readonly BuildFocus[] = ["auto", "burst", "dps", "bruiser", "split"];
 
 type MessageHandler = (ws: WebSocket, message: Record<string, unknown>) => Promise<void> | void;
 
@@ -29,6 +30,8 @@ export class MessageRouter {
       ["TRIGGER_ANALYSIS", this.handleTriggerAnalysis],
       ["SET_LLM_PROVIDER", this.handleSetLlmProvider],
       ["SET_RISK_LEVEL", this.handleSetRiskLevel],
+      ["SET_BUILD_FOCUS", this.handleSetBuildFocus],
+      ["SET_PREFER_PASSIVE_ITEMS", this.handleSetPreferPassiveItems],
       ["GET_MODELS", this.handleGetModels],
       ["VALIDATE_KEY", this.handleValidateKey],
     ]);
@@ -60,6 +63,21 @@ export class MessageRouter {
       this.orchestrator.setRiskLevel(level as RiskLevel);
     } else {
       Logger.warn(`[MessageRouter] Ignoring invalid risk level: ${String(level)}`);
+    }
+  };
+
+  private handleSetBuildFocus: MessageHandler = (_ws, message) => {
+    const focus = message.buildFocus;
+    if (typeof focus === "string" && VALID_BUILD_FOCUSES.includes(focus as BuildFocus)) {
+      this.orchestrator.setBuildFocus(focus as BuildFocus);
+    } else {
+      Logger.warn(`[MessageRouter] Ignoring invalid build focus: ${String(focus)}`);
+    }
+  };
+
+  private handleSetPreferPassiveItems: MessageHandler = (_ws, message) => {
+    if (typeof message.preferPassiveItems === "boolean") {
+      this.orchestrator.setPreferPassiveItems(message.preferPassiveItems);
     }
   };
 

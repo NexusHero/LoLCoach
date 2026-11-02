@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GeminiProvider = exports.GEMINI_DEFAULT_MODEL = void 0;
 const genai_1 = require("@google/genai");
 const llmProvider_js_1 = require("../llmProvider.js");
+const types_js_1 = require("../types.js");
 const logger_js_1 = require("../logger.js");
 exports.GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
 class GeminiProvider {
@@ -54,11 +55,11 @@ class GeminiProvider {
         }
         return combined;
     }
-    async getAnalysis(state) {
+    async getAnalysis(state, risk = types_js_1.DEFAULT_RISK_LEVEL, options) {
         try {
             const result = await this.client.models.generateContent({
                 model: this.modelId,
-                contents: await (0, llmProvider_js_1.buildUserPrompt)(state),
+                contents: await (0, llmProvider_js_1.buildUserPrompt)(state, risk, options),
                 config: {
                     systemInstruction: llmProvider_js_1.SYSTEM_PROMPT,
                     maxOutputTokens: 700,

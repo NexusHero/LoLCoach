@@ -1,10 +1,12 @@
 // ignore_for_file: lines_longer_than_80_chars
 import 'package:flutter/material.dart';
 import 'package:lol_coach/models/game_state.dart';
+import 'package:lol_coach/models/tactical_insights.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/utils/ddragon.dart';
 import 'package:lol_coach/widgets/common/badge.dart';
+import 'package:lol_coach/widgets/common/build_focus_selector.dart';
 import 'package:lol_coach/widgets/common/champ_avatar.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
 import 'package:lol_coach/widgets/common/item_row.dart';
@@ -14,10 +16,20 @@ class LocalPlayerCard extends StatefulWidget {
   const LocalPlayerCard({
     required this.player,
     required this.activePlayer,
+    this.tacticalInsights,
+    this.buildFocus,
+    this.onBuildFocusChanged,
+    this.preferPassiveItems = false,
+    this.onPreferPassiveChanged,
     super.key,
   });
   final Player player;
   final ActivePlayer activePlayer;
+  final TacticalInsights? tacticalInsights;
+  final String? buildFocus;
+  final ValueChanged<String>? onBuildFocusChanged;
+  final bool preferPassiveItems;
+  final ValueChanged<bool>? onPreferPassiveChanged;
 
   @override
   State<LocalPlayerCard> createState() => _LocalPlayerCardState();
@@ -117,7 +129,10 @@ class _LocalPlayerCardState extends State<LocalPlayerCard> {
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  'CS ${scores.creepScore}',
+                                  widget.tacticalInsights != null &&
+                                          widget.tacticalInsights!.csPerMin > 0
+                                      ? 'CS ${scores.creepScore} (${widget.tacticalInsights!.csPerMin}/${widget.tacticalInsights!.targetCsPerMin})'
+                                      : 'CS ${scores.creepScore}',
                                   style: AppTextStyles.mono.copyWith(
                                     color: colors.textSecondary,
                                     fontSize: 12,
@@ -219,6 +234,15 @@ class _LocalPlayerCardState extends State<LocalPlayerCard> {
                     ),
                   ],
                 ),
+                if (widget.onBuildFocusChanged != null) ...[
+                  const SizedBox(height: 10),
+                  BuildFocusSelector(
+                    selectedFocus: widget.buildFocus ?? 'auto',
+                    onFocusChanged: widget.onBuildFocusChanged!,
+                    preferPassive: widget.preferPassiveItems,
+                    onPreferPassiveChanged: widget.onPreferPassiveChanged,
+                  ),
+                ],
               ],
             ),
           ),

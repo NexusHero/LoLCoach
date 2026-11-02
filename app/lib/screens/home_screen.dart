@@ -9,6 +9,7 @@ import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/app_background.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
 import 'package:lol_coach/widgets/game_view.dart';
+import 'package:lol_coach/widgets/standby_dashboard.dart';
 
 String _providerLabel(String type) => switch (type) {
       'claude' => 'Claude',
@@ -104,10 +105,16 @@ class HomeScreen extends ConsumerWidget {
           ),
         );
       case ConnectionStatus.connected:
-        if (!ws.gameActive || ws.gameState == null) return const _WaitingView();
+        if (!ws.gameActive || ws.gameState == null) {
+          return StandbyDashboard(
+            autopsy: ws.postGameAutopsy ?? ws.playerProfile?.lastAutopsy,
+            profile: ws.playerProfile,
+          );
+        }
         return GameView(
           gameState: ws.gameState!,
           recommendation: ws.recommendation,
+          tacticalInsights: ws.tacticalInsights,
           lastEvent: ws.lastEvent,
           triggerEvent: ws.triggerEvent,
           isAnalyzing: ws.isAnalyzing,
@@ -117,6 +124,12 @@ class HomeScreen extends ConsumerWidget {
           riskLevel: _isAiProvider(ws.activeProviderType) ? ws.riskLevel : null,
           onRiskLevelChanged:
               _isAiProvider(ws.activeProviderType) ? ws.setRiskLevel : null,
+          buildFocus: ws.buildFocus,
+          onBuildFocusChanged: ws.setBuildFocus,
+          preferPassiveItems: ws.preferPassiveItems,
+          onPreferPassiveChanged: (v) => ws.setPreferPassiveItems(prefer: v),
+          proMode: ws.proMode,
+          onProModeChanged: (v) => ws.setProMode(enabled: v),
           onRefresh: ws.triggerAnalysis,
           aiEnabled: _isAiProvider(ws.activeProviderType),
         );
@@ -176,10 +189,6 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-// ─── Live pill ───────────────────────────────────────────────────────────────
-
-/// Compact header pill mirroring the design's "<Provider> · live" indicator,
-/// with a breathing violet dot while the AI is coaching.
 class _LivePill extends StatefulWidget {
   const _LivePill({required this.providerType, required this.llmFailed});
   final String providerType;
@@ -276,161 +285,6 @@ class _LivePillState extends State<_LivePill>
           ),
         ],
       ),
-    );
-  }
-}
-
-// ─── Waiting view ────────────────────────────────────────────────────────────
-
-class _WaitingView extends StatefulWidget {
-  const _WaitingView();
-
-  @override
-  State<_WaitingView> createState() => _WaitingViewState();
-}
-
-class _WaitingViewState extends State<_WaitingView>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulseCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _pulseCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: GameCard(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    AnimatedBuilder(
-                      animation: _pulseCtrl,
-                      builder: (_, child) => Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: colors.magicSubtle,
-                          border: Border.all(
-                            color: colors.magic.withValues(
-                              alpha: 0.3 + _pulseCtrl.value * 0.4,
-                            ),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: colors.magic.withValues(
-                                alpha: _pulseCtrl.value * 0.25,
-                              ),
-                              blurRadius: 16,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: child,
-                      ),
-                      child: Icon(
-                        Icons.radar_rounded,
-                        size: 22,
-                        color: colors.magic,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'STANDBY',
-                            style: AppTextStyles.eyebrow.copyWith(
-                              color: colors.magic,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'Ready to coach',
-                            style: AppTextStyles.title,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const _StepRow(
-                  done: true,
-                  text: 'Core connected',
-                ),
-                const SizedBox(height: 14),
-                const _StepRow(
-                  done: false,
-                  text: 'Start a League of Legends match',
-                ),
-                const SizedBox(height: 14),
-                const _StepRow(
-                  done: false,
-                  text: 'Advice appears automatically as the match unfolds',
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StepRow extends StatelessWidget {
-  const _StepRow({required this.done, required this.text});
-  final bool done;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final color = done ? colors.success : colors.textDisabled;
-    return Row(
-      children: [
-        Container(
-          width: 20,
-          height: 20,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: done ? colors.successSubtle : Colors.transparent,
-            border: Border.all(color: color, width: 1.5),
-          ),
-          child: done ? Icon(Icons.check, size: 12, color: color) : null,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: AppTextStyles.body.copyWith(
-              color: done ? colors.textPrimary : colors.textSecondary,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

@@ -27,6 +27,11 @@ export interface ItemInfo {
   name: string;
   stats: string;
   plaintext: string;
+  totalGold?: number;
+  baseGold?: number;
+  from?: number[];
+  into?: number[];
+  tags?: string[];
 }
 
 export interface ChampionAbilities {
@@ -34,6 +39,10 @@ export interface ChampionAbilities {
   w: string;
   e: string;
   r: string;
+  qCooldown?: number[];
+  wCooldown?: number[];
+  eCooldown?: number[];
+  rCooldown?: number[];
 }
 
 interface CacheFile {
@@ -50,6 +59,14 @@ interface DDragonItem {
   stats?: Record<string, number>;
   inStore?: boolean;
   maps?: Record<string, boolean>;
+  gold?: {
+    base?: number;
+    total?: number;
+    purchasable?: boolean;
+  };
+  from?: string[];
+  into?: string[];
+  tags?: string[];
 }
 
 interface DDragonChampionSummary {
@@ -59,7 +76,11 @@ interface DDragonChampionSummary {
 }
 
 interface DDragonChampionDetail {
-  spells: Array<{ name: string }>;
+  spells: Array<{
+    name: string;
+    cooldown?: number[];
+    range?: number[];
+  }>;
 }
 
 export class DDragonService {
@@ -113,6 +134,10 @@ export class DDragonService {
     return this.items[id];
   }
 
+  getAllItems(): Record<number, ItemInfo> {
+    return this.items;
+  }
+
   /** Returns Riot's official champion tags (e.g. ["Mage","Assassin"], ["Tank"], ["Marksman"]). */
   getChampionTags(displayName: string): string[] {
     return this.championTags[displayName] ?? [];
@@ -135,6 +160,10 @@ export class DDragonService {
         w: champ.spells[1].name,
         e: champ.spells[2].name,
         r: champ.spells[3].name,
+        ...(champ.spells[0].cooldown ? { qCooldown: champ.spells[0].cooldown } : {}),
+        ...(champ.spells[1].cooldown ? { wCooldown: champ.spells[1].cooldown } : {}),
+        ...(champ.spells[2].cooldown ? { eCooldown: champ.spells[2].cooldown } : {}),
+        ...(champ.spells[3].cooldown ? { rCooldown: champ.spells[3].cooldown } : {}),
       };
       this.champions[displayName] = abilities;
       this.saveCache().catch(() => {});
@@ -155,10 +184,17 @@ export class DDragonService {
     for (const [id, item] of Object.entries(data.data)) {
       if (!item.name || item.inStore === false) continue;
       const stats = this.formatStats(item.stats ?? {});
+      const fromIds = item.from?.map(Number).filter((n) => !Number.isNaN(n) && n > 0);
+      const intoIds = item.into?.map(Number).filter((n) => !Number.isNaN(n) && n > 0);
       this.items[Number(id)] = {
         name: item.name,
         stats,
         plaintext: item.plaintext ?? "",
+        ...(item.gold?.total !== undefined ? { totalGold: item.gold.total } : {}),
+        ...(item.gold?.base !== undefined ? { baseGold: item.gold.base } : {}),
+        ...(fromIds?.length ? { from: fromIds } : {}),
+        ...(intoIds?.length ? { into: intoIds } : {}),
+        ...(item.tags?.length ? { tags: item.tags } : {}),
       };
     }
   }

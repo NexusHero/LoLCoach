@@ -2,12 +2,15 @@
 import 'package:flutter/material.dart';
 import 'package:lol_coach/models/game_state.dart';
 import 'package:lol_coach/models/recommendation.dart';
+import 'package:lol_coach/models/tactical_insights.dart';
 import 'package:lol_coach/models/token_usage.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
+import 'package:lol_coach/widgets/challenger_pro_hud.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
 import 'package:lol_coach/widgets/game_top_bar.dart';
 import 'package:lol_coach/widgets/local_player_card.dart';
+import 'package:lol_coach/widgets/macro_alert_strip.dart';
 import 'package:lol_coach/widgets/recommendation_panel.dart';
 import 'package:lol_coach/widgets/scoreboard.dart';
 
@@ -17,6 +20,7 @@ class GameView extends StatelessWidget {
     required this.lastEvent,
     super.key,
     this.recommendation,
+    this.tacticalInsights,
     this.triggerEvent,
     this.isAnalyzing = false,
     this.recommendationTime,
@@ -25,11 +29,18 @@ class GameView extends StatelessWidget {
     this.isBudgetExceeded = false,
     this.riskLevel,
     this.onRiskLevelChanged,
+    this.buildFocus,
+    this.onBuildFocusChanged,
+    this.preferPassiveItems = false,
+    this.onPreferPassiveChanged,
+    this.proMode = false,
+    this.onProModeChanged,
     this.onRefresh,
     this.aiEnabled = true,
   });
   final ParsedGameState gameState;
   final ItemRecommendation? recommendation;
+  final TacticalInsights? tacticalInsights;
   final String lastEvent;
   final String? triggerEvent;
   final bool isAnalyzing;
@@ -39,6 +50,12 @@ class GameView extends StatelessWidget {
   final bool isBudgetExceeded;
   final String? riskLevel;
   final ValueChanged<String>? onRiskLevelChanged;
+  final String? buildFocus;
+  final ValueChanged<String>? onBuildFocusChanged;
+  final bool preferPassiveItems;
+  final ValueChanged<bool>? onPreferPassiveChanged;
+  final bool proMode;
+  final ValueChanged<bool>? onProModeChanged;
   final VoidCallback? onRefresh;
 
   /// Whether an AI provider is active. In Basic rules mode the bridge never
@@ -63,6 +80,7 @@ class GameView extends StatelessWidget {
     if (recommendation != null) {
       return RecommendationPanel(
         recommendation: recommendation!,
+        tacticalInsights: tacticalInsights,
         triggerEvent: triggerEvent,
         localChampion: gameState.localPlayer.championName,
         opponentChampion: _laneOpponent,
@@ -92,11 +110,28 @@ class GameView extends StatelessWidget {
                 gameState: gameState,
                 riskLevel: riskLevel,
                 onRiskLevelChanged: onRiskLevelChanged,
+                proMode: proMode,
+                onProModeChanged: onProModeChanged,
                 onRefresh: onRefresh,
                 isAnalyzing: isAnalyzing,
               ),
+              if (tacticalInsights != null) ...[
+                const SizedBox(height: 10),
+                MacroAlertStrip(insights: tacticalInsights!),
+              ],
               const SizedBox(height: 14),
-              if (isWide)
+              if (proMode)
+                ChallengerProHud(
+                  gameState: gameState,
+                  recommendation: recommendation,
+                  tacticalInsights: tacticalInsights,
+                  opponentChampion: _laneOpponent,
+                  buildFocus: buildFocus ?? 'auto',
+                  onBuildFocusChanged: onBuildFocusChanged,
+                  preferPassiveItems: preferPassiveItems,
+                  onPreferPassiveChanged: onPreferPassiveChanged,
+                )
+              else if (isWide)
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -113,6 +148,11 @@ class GameView extends StatelessWidget {
                           LocalPlayerCard(
                             player: gameState.localPlayer,
                             activePlayer: gameState.activePlayer,
+                            tacticalInsights: tacticalInsights,
+                            buildFocus: buildFocus,
+                            onBuildFocusChanged: onBuildFocusChanged,
+                            preferPassiveItems: preferPassiveItems,
+                            onPreferPassiveChanged: onPreferPassiveChanged,
                           ),
                           const SizedBox(height: 14),
                           ScoreboardSection(
@@ -132,6 +172,11 @@ class GameView extends StatelessWidget {
                 LocalPlayerCard(
                   player: gameState.localPlayer,
                   activePlayer: gameState.activePlayer,
+                  tacticalInsights: tacticalInsights,
+                  buildFocus: buildFocus,
+                  onBuildFocusChanged: onBuildFocusChanged,
+                  preferPassiveItems: preferPassiveItems,
+                  onPreferPassiveChanged: onPreferPassiveChanged,
                 ),
                 const SizedBox(height: 12),
                 ScoreboardSection(

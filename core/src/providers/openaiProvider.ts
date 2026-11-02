@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { LlmProvider, LlmAnalysis, ModelInfo, TokenUsage } from "../llmProvider.js";
+import type { LlmProvider, LlmAnalysis, ModelInfo, TokenUsage, LlmContextOptions } from "../llmProvider.js";
 import { SYSTEM_PROMPT, buildUserPrompt, parseAnalysisResponse } from "../llmProvider.js";
 import type { ParsedGameState, RiskLevel } from "../types.js";
 import { DEFAULT_RISK_LEVEL } from "../types.js";
@@ -25,7 +25,11 @@ export class OpenAiProvider implements LlmProvider {
       .map((m) => ({ id: m.id, displayName: m.id }));
   }
 
-  async getAnalysis(state: ParsedGameState, risk: RiskLevel = DEFAULT_RISK_LEVEL): Promise<LlmAnalysis> {
+  async getAnalysis(
+    state: ParsedGameState,
+    risk: RiskLevel = DEFAULT_RISK_LEVEL,
+    options?: LlmContextOptions,
+  ): Promise<LlmAnalysis> {
     try {
       const response = await this.client.chat.completions.create({
         model: this.model,
@@ -33,7 +37,7 @@ export class OpenAiProvider implements LlmProvider {
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: await buildUserPrompt(state, risk) },
+          { role: "user", content: await buildUserPrompt(state, risk, options) },
         ],
       });
 

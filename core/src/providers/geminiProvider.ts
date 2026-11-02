@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import type { LlmProvider, LlmAnalysis, ModelInfo, TokenUsage } from "../llmProvider.js";
+import type { LlmProvider, LlmAnalysis, ModelInfo, TokenUsage, LlmContextOptions } from "../llmProvider.js";
 import { SYSTEM_PROMPT, buildUserPrompt, parseAnalysisResponse } from "../llmProvider.js";
 import type { ParsedGameState, RiskLevel } from "../types.js";
 import { DEFAULT_RISK_LEVEL } from "../types.js";
@@ -65,11 +65,15 @@ export class GeminiProvider implements LlmProvider {
     return combined;
   }
 
-  async getAnalysis(state: ParsedGameState, risk: RiskLevel = DEFAULT_RISK_LEVEL): Promise<LlmAnalysis> {
+  async getAnalysis(
+    state: ParsedGameState,
+    risk: RiskLevel = DEFAULT_RISK_LEVEL,
+    options?: LlmContextOptions,
+  ): Promise<LlmAnalysis> {
     try {
       const result = await this.client.models.generateContent({
         model: this.modelId,
-        contents: await buildUserPrompt(state, risk),
+        contents: await buildUserPrompt(state, risk, options),
         config: {
           systemInstruction: SYSTEM_PROMPT,
           maxOutputTokens: 700,

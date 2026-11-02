@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const orchestrator_js_1 = require("../orchestrator.js");
 const eventDetector_js_1 = require("../eventDetector.js");
+const recommendationEngine_js_1 = require("../recommendationEngine.js");
 const fixtures_js_1 = require("./fixtures.js");
 describe("Integration: Match Progressions", () => {
     function setup() {
@@ -26,7 +27,7 @@ describe("Integration: Match Progressions", () => {
                 },
             }),
         };
-        const orchestrator = new orchestrator_js_1.BridgeOrchestrator(wsServer, new eventDetector_js_1.EventDetector(), llmProvider, { summonerName: "TestPlayer", llmCooldownMs: 7 * 60 * 1000 }, clock);
+        const orchestrator = new orchestrator_js_1.BridgeOrchestrator(wsServer, new eventDetector_js_1.EventDetector(), new recommendationEngine_js_1.RecommendationEngine(), llmProvider, { summonerName: "TestPlayer", llmCooldownMs: 7 * 60 * 1000 }, clock);
         return { orchestrator, wsServer, llmProvider, broadcasts, advanceTime };
     }
     const makeEnemy = (championName, kills, deaths, level) => (0, fixtures_js_1.makePlayer)({

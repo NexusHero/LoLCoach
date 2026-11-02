@@ -1,4 +1,11 @@
-import type { ParsedGameState, GameEvent, WsMessage, RiskLevel } from "./types.js";
+import type {
+  ParsedGameState,
+  GameEvent,
+  WsMessage,
+  RiskLevel,
+  BuildFocus,
+  RecommendedItem,
+} from "./types.js";
 import type { LlmProvider } from "./llmProvider.js";
 import type { RecommendationCallbacks } from "./recommendationEngine.js";
 
@@ -24,6 +31,10 @@ export interface IRecommendationEngine {
   setLlmProvider(provider: LlmProvider | null): void;
   setTokenBudget(budget: number): void;
   setRiskLevel(level: RiskLevel): void;
+  setBuildFocus?(focus: BuildFocus): void;
+  setPreferPassiveItems?(prefer: boolean): void;
+  setHabitWarnings?(warnings: string[]): void;
+  getLastRecommendedItems?(): RecommendedItem[];
   reset(): void;
   process(
     state: ParsedGameState,

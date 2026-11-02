@@ -16,6 +16,8 @@ class GameTopBar extends StatelessWidget {
     super.key,
     this.riskLevel,
     this.onRiskLevelChanged,
+    this.proMode = false,
+    this.onProModeChanged,
     this.onRefresh,
     this.isAnalyzing = false,
   });
@@ -25,6 +27,8 @@ class GameTopBar extends StatelessWidget {
   /// sense when an LLM is actually shaping the recommendation.
   final String? riskLevel;
   final ValueChanged<String>? onRiskLevelChanged;
+  final bool proMode;
+  final ValueChanged<bool>? onProModeChanged;
   final VoidCallback? onRefresh;
   final bool isAnalyzing;
 
@@ -81,6 +85,13 @@ class GameTopBar extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (onProModeChanged != null) ...[
+                _ProHudToggleButton(
+                  enabled: proMode,
+                  onTap: () => onProModeChanged!(!proMode),
+                ),
+                const SizedBox(width: 8),
+              ],
               if (hasRisk)
                 RiskControl(
                   value: riskLevel!,
@@ -137,6 +148,58 @@ class _HudPill extends StatelessWidget {
             style: AppTextStyles.mono.copyWith(color: textColor),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ProHudToggleButton extends StatelessWidget {
+  const _ProHudToggleButton({
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final accent = enabled ? colors.gold : colors.textSecondary;
+    return Tooltip(
+      message: 'Toggle Challenger Pro HUD (0.2s glance mode)',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(100),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: enabled ? colors.goldSubtle : colors.surface2,
+            borderRadius: BorderRadius.circular(100),
+            border: Border.all(
+              color: enabled ? colors.champagneLine : colors.border,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                enabled ? Icons.visibility_rounded : Icons.visibility_outlined,
+                size: 13,
+                color: accent,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                'PRO HUD',
+                style: AppTextStyles.micro.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -120,10 +120,12 @@ const poller = new LiveClientPoller(
   (data) => orchestrator.handleGameData(data),
   (active) => {
     if (!active) {
-      orchestrator.resetDetector();
+      const autopsy = orchestrator.resetDetector();
       wsServer.broadcast({
         event: "GAME_INACTIVE",
         timestamp: Date.now(),
+        ...(autopsy ? { postGameAutopsy: autopsy } : {}),
+        playerProfile: orchestrator.getPlayerProfile(),
       });
     }
   },

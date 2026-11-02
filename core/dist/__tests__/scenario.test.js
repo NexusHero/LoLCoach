@@ -8,6 +8,7 @@ const ws_2 = __importDefault(require("ws"));
 const wsServer_js_1 = require("../wsServer.js");
 const orchestrator_js_1 = require("../orchestrator.js");
 const eventDetector_js_1 = require("../eventDetector.js");
+const recommendationEngine_js_1 = require("../recommendationEngine.js");
 const messageRouter_js_1 = require("../messageRouter.js");
 const poller_js_1 = require("../poller.js");
 const gameScenario_js_1 = require("./gameScenario.js");
@@ -41,8 +42,9 @@ function buildStack() {
     let _orchestrator;
     let _router;
     const wss = new ws_1.WebSocketServer({ host: "127.0.0.1", port: 0 });
-    const wsServer = new wsServer_js_1.BridgeWsServer(wss, (_ws, msg) => _router.handle(_ws, msg));
-    _orchestrator = new orchestrator_js_1.BridgeOrchestrator(wsServer, new eventDetector_js_1.EventDetector(), null, {
+    const wsServer = new wsServer_js_1.BridgeWsServer(wss);
+    wsServer.setMessageHandler((_ws, msg) => _router.handle(_ws, msg));
+    _orchestrator = new orchestrator_js_1.BridgeOrchestrator(wsServer, new eventDetector_js_1.EventDetector(), new recommendationEngine_js_1.RecommendationEngine(), null, {
         summonerName: "TestPlayer",
         llmCooldownMs: 0,
     });

@@ -8,6 +8,7 @@ const ws_2 = __importDefault(require("ws"));
 const wsServer_1 = require("../wsServer");
 const orchestrator_1 = require("../orchestrator");
 const eventDetector_1 = require("../eventDetector");
+const recommendationEngine_1 = require("../recommendationEngine");
 const messageRouter_1 = require("../messageRouter");
 const fixtures_1 = require("./fixtures");
 // System tests: wire together all real components the same way index.ts does.
@@ -47,8 +48,9 @@ describe("System: Full Bridge Wiring (e2e)", () => {
         // Mirror the closure pattern from index.ts
         let _orchestrator;
         let _messageRouter;
-        wsServer = new wsServer_1.BridgeWsServer(wss, (_ws, msg) => _messageRouter.handle(_ws, msg));
-        _orchestrator = new orchestrator_1.BridgeOrchestrator(wsServer, new eventDetector_1.EventDetector(), null, { summonerName: "TestPlayer", llmCooldownMs: 0 });
+        wsServer = new wsServer_1.BridgeWsServer(wss);
+        wsServer.setMessageHandler((_ws, msg) => _messageRouter.handle(_ws, msg));
+        _orchestrator = new orchestrator_1.BridgeOrchestrator(wsServer, new eventDetector_1.EventDetector(), new recommendationEngine_1.RecommendationEngine(), null, { summonerName: "TestPlayer", llmCooldownMs: 0 });
         _messageRouter = new messageRouter_1.MessageRouter(_orchestrator);
         orchestrator = _orchestrator;
         messageRouter = _messageRouter;
@@ -120,6 +122,23 @@ describe("System: Full Bridge Wiring (e2e)", () => {
         await orchestrator.handleGameData((0, fixtures_1.makeRawGameData)());
         const messages = await collecting;
         expect(messages.find((m) => m.event === "RECOMMENDATION_UPDATE")).toBeUndefined();
+        client.close();
+    });
+    it("system_ClientSendsSetRiskLevel_PropagatesToGetAnalysisCall", async () => {
+        const { createLlmProvider } = jest.requireMock("../llmProvider");
+        const getAnalysis = jest.fn().mockResolvedValue({
+            reasoning: "",
+            strategy: { winCondition: "mid", summary: "", immediateAction: "", lateGamePlan: "" },
+        });
+        createLlmProvider.mockResolvedValue({ name: "mock-provider", getAnalysis });
+        const client = new ws_2.default(`ws://127.0.0.1:${port}`);
+        await waitForMessage(client, "CONNECTED");
+        client.send(JSON.stringify({ event: "SET_LLM_PROVIDER", provider: "claude", apiKey: "sk-test" }));
+        client.send(JSON.stringify({ event: "SET_RISK_LEVEL", riskLevel: "risky" }));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        await orchestrator.handleGameData((0, fixtures_1.makeRawGameData)());
+        await waitForMessage(client, "RECOMMENDATION_UPDATE");
+        expect(getAnalysis).toHaveBeenCalledWith(expect.anything(), "risky");
         client.close();
     });
 });

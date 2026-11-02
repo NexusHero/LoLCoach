@@ -1,7 +1,16 @@
 import { inject, singleton } from "tsyringe";
 import { parseGameState } from "./parser.js";
 import type { LlmProvider } from "./llmProvider.js";
-import type { AllGameData, ParsedGameState, RiskLevel } from "./types.js";
+import type {
+  AllGameData,
+  ParsedGameState,
+  RiskLevel,
+  BuildFocus,
+  TacticalInsights,
+  PostGameAutopsy,
+  PlayerHabitProfile,
+} from "./types.js";
+import { DEFAULT_BUILD_FOCUS } from "./types.js";
 import type { IEventDetector, IRecommendationEngine, IWsBroadcaster } from "./interfaces.js";
 import { Logger } from "./logger.js";
 import {
@@ -12,6 +21,18 @@ import {
   RECOMMENDATION_ENGINE_TOKEN,
   WS_BROADCASTER_TOKEN,
 } from "./tokens.js";
+import {
+  computePrimaryThreat,
+  computeTeamDamageProfile,
+  computeNextBestBuy,
+  computeEnemyCooldowns,
+} from "./tacticalAnalyzer.js";
+import {
+  computeObjectives,
+  computeMacroAlerts,
+  findObjectiveSetupTrigger,
+} from "./macroTracker.js";
+import { PlayerProfileService } from "./playerProfileService.js";
 
 export interface OrchestratorConfig {
   summonerName: string;
@@ -23,13 +44,12 @@ export interface OrchestratorConfig {
 export class BridgeOrchestrator {
   private lastState: ParsedGameState | null = null;
   private correlationCounter = 0;
+  private buildFocus: BuildFocus = DEFAULT_BUILD_FOCUS;
+  private preferPassiveItems = false;
+  private lastObjectiveTriggerKey = "";
+  private readonly profileService = new PlayerProfileService();
 
   constructor(
-    // Depends on abstractions (DIP), not the concrete classes — the tokens
-    // are `useToken` aliases to the existing singletons in index.ts, so this
-    // still resolves to the one shared instance of each, just through an
-    // interface. `tsx`/esbuild doesn't emit `design:paramtypes` metadata, so
-    // every param is explicitly @inject()'d regardless (see tokens.ts).
     @inject(WS_BROADCASTER_TOKEN) private readonly wsServer: IWsBroadcaster,
     @inject(EVENT_DETECTOR_TOKEN) private readonly eventDetector: IEventDetector,
     @inject(RECOMMENDATION_ENGINE_TOKEN) private readonly engine: IRecommendationEngine,
@@ -41,6 +61,31 @@ export class BridgeOrchestrator {
     if (this.config.tokenBudget) {
       this.engine.setTokenBudget(this.config.tokenBudget);
     }
+    this.profileService.load().catch(() => {});
+  }
+
+  private async computeTacticalInsights(state: ParsedGameState): Promise<TacticalInsights> {
+    const telemetry = this.profileService.observeTick(state);
+    const objectives = computeObjectives(state);
+    const macroAlerts = computeMacroAlerts(state, objectives, telemetry.goldHoardingSeconds);
+    const primaryThreat = computePrimaryThreat(state);
+    const teamDamageProfile = computeTeamDamageProfile(state);
+    const recommendedItems = this.engine.getLastRecommendedItems?.() ?? [];
+    const nextBestBuy = computeNextBestBuy(state, recommendedItems);
+    const enemyCooldowns = await computeEnemyCooldowns(state);
+
+    return {
+      ...(primaryThreat ? { primaryThreat } : {}),
+      teamDamageProfile,
+      ...(nextBestBuy ? { nextBestBuy } : {}),
+      ...(enemyCooldowns ? { enemyCooldowns } : {}),
+      macroAlerts,
+      objectives,
+      csPerMin: telemetry.csPerMin,
+      targetCsPerMin: telemetry.targetCsPerMin,
+      buildFocus: this.buildFocus,
+      preferPassiveItems: this.preferPassiveItems,
+    };
   }
 
   async handleGameData(raw: AllGameData): Promise<void> {
@@ -51,7 +96,23 @@ export class BridgeOrchestrator {
     }
     const state = stateResult.value;
     this.lastState = state;
+
+    const profile = this.profileService.getProfile();
+    this.engine.setHabitWarnings?.(profile.habitWarnings);
+
+    let insights = await this.computeTacticalInsights(state);
     const events = this.eventDetector.detect(state);
+
+    // Check Objective T-60s Setup Window trigger
+    const setupObj = findObjectiveSetupTrigger(insights.objectives);
+    if (setupObj) {
+      const spawnMinuteBucket = Math.floor((state.gameTime + setupObj.secondsUntilSpawn) / 60);
+      const triggerKey = `${setupObj.type}_${spawnMinuteBucket}`;
+      if (triggerKey !== this.lastObjectiveTriggerKey) {
+        this.lastObjectiveTriggerKey = triggerKey;
+        await this.sendRecommendation(state, "OBJECTIVE_SETUP_WINDOW", insights);
+      }
+    }
 
     for (const event of events) {
       Logger.info(`[Event] ${event.type}`);
@@ -63,18 +124,31 @@ export class BridgeOrchestrator {
         event.type === "HIGH_GOLD_REACHED";
 
       if (shouldRecommend) {
-        await this.sendRecommendation(event.state, event.type);
+        await this.sendRecommendation(event.state, event.type, insights);
+        const updatedNextBuy = computeNextBestBuy(
+          state,
+          this.engine.getLastRecommendedItems?.() ?? [],
+        );
+        if (updatedNextBuy) {
+          insights = { ...insights, nextBestBuy: updatedNextBuy };
+        }
       }
 
       this.wsServer.broadcast({
         event: event.type,
         timestamp: this.clock(),
         gameState: event.state,
+        tacticalInsights: insights,
+        playerProfile: profile,
       });
     }
   }
 
-  private async sendRecommendation(state: ParsedGameState, eventType: string): Promise<void> {
+  private async sendRecommendation(
+    state: ParsedGameState,
+    eventType: string,
+    insights?: TacticalInsights,
+  ): Promise<void> {
     const correlationId = `${eventType}_${++this.correlationCounter}`;
     const hasClients = this.wsServer.clientCount > 0;
 
@@ -91,11 +165,16 @@ export class BridgeOrchestrator {
         this.wsServer.broadcast({ event: "LLM_ERROR", timestamp: this.clock(), error: msg });
       },
       onLlmSuccess: (rec, tokenUsage) => {
+        const nextBestBuy = computeNextBestBuy(state, rec.items);
+        const enrichedInsights = insights
+          ? { ...insights, ...(nextBestBuy ? { nextBestBuy } : {}) }
+          : undefined;
         this.wsServer.broadcast({
           event: "RECOMMENDATION_UPDATE",
           timestamp: this.clock(),
           gameState: state,
           recommendation: rec,
+          ...(enrichedInsights ? { tacticalInsights: enrichedInsights } : {}),
           correlationId,
           triggerEvent: eventType,
           tokenUsage,
@@ -110,13 +189,21 @@ export class BridgeOrchestrator {
       return;
     }
     Logger.info("[Orchestrator] Manual analysis triggered.");
-    await this.sendRecommendation(this.lastState, "MANUAL");
+    const insights = await this.computeTacticalInsights(this.lastState);
+    await this.sendRecommendation(this.lastState, "MANUAL", insights);
   }
 
-  resetDetector(): void {
+  resetDetector(): PostGameAutopsy | undefined {
+    const autopsy = this.profileService.finalizeMatch(this.clock());
     this.lastState = null;
+    this.lastObjectiveTriggerKey = "";
     this.eventDetector.reset();
     this.engine.reset();
+    return autopsy;
+  }
+
+  getPlayerProfile(): PlayerHabitProfile {
+    return this.profileService.getProfile();
   }
 
   setTokenBudget(budget: number): void {
@@ -138,5 +225,15 @@ export class BridgeOrchestrator {
 
   setRiskLevel(level: RiskLevel): void {
     this.engine.setRiskLevel(level);
+  }
+
+  setBuildFocus(focus: BuildFocus): void {
+    this.buildFocus = focus;
+    this.engine.setBuildFocus?.(focus);
+  }
+
+  setPreferPassiveItems(prefer: boolean): void {
+    this.preferPassiveItems = prefer;
+    this.engine.setPreferPassiveItems?.(prefer);
   }
 }

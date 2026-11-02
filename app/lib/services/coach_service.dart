@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:lol_coach/models/game_state.dart';
 import 'package:lol_coach/models/model_info.dart';
 import 'package:lol_coach/models/recommendation.dart';
+import 'package:lol_coach/models/tactical_insights.dart';
 import 'package:lol_coach/models/token_usage.dart';
 import 'package:lol_coach/models/ws_message.dart';
 import 'package:lol_coach/services/storage_service.dart';
@@ -23,6 +24,9 @@ String? _loadCoreSecret() {
 class CoachService extends ChangeNotifier {
   CoachService(this._client, [this._storage]) {
     _riskLevel = _storage?.riskLevel ?? 'normal';
+    _buildFocus = _storage?.buildFocus ?? 'auto';
+    _preferPassiveItems = _storage?.preferPassiveItems ?? false;
+    _proMode = _storage?.proMode ?? false;
     _client.addListener(_onClientStatusChanged);
     _subscription = _client.messages.listen(_onMessage);
   }
@@ -33,6 +37,9 @@ class CoachService extends ChangeNotifier {
 
   ParsedGameState? _gameState;
   ItemRecommendation? _recommendation;
+  TacticalInsights? _tacticalInsights;
+  PlayerHabitProfile? _playerProfile;
+  PostGameAutopsy? _postGameAutopsy;
   String _lastEvent = '';
   bool _gameActive = false;
   bool _isAnalyzing = false;
@@ -58,11 +65,17 @@ class CoachService extends ChangeNotifier {
   String? _activeApiKey;
   int _activeTokenBudget = 0;
   String _riskLevel = 'normal';
+  String _buildFocus = 'auto';
+  bool _preferPassiveItems = false;
+  bool _proMode = false;
 
   ConnectionStatus get status => _client.status;
   String? get lastError => _client.lastError;
   bool get isConnected => _client.isConnected;
   String get riskLevel => _riskLevel;
+  String get buildFocus => _buildFocus;
+  bool get preferPassiveItems => _preferPassiveItems;
+  bool get proMode => _proMode;
 
   String? get lastLlmError => _lastLlmError;
   String get activeProviderType => _activeProviderType ?? 'none';
@@ -77,6 +90,9 @@ class CoachService extends ChangeNotifier {
   bool get isBudgetExceeded => _isBudgetExceeded;
   ParsedGameState? get gameState => _gameState;
   ItemRecommendation? get recommendation => _recommendation;
+  TacticalInsights? get tacticalInsights => _tacticalInsights;
+  PlayerHabitProfile? get playerProfile => _playerProfile;
+  PostGameAutopsy? get postGameAutopsy => _postGameAutopsy;
   String get lastEvent => _lastEvent;
   bool get gameActive => _gameActive;
   bool get isAnalyzing => _isAnalyzing;
@@ -138,6 +154,20 @@ class CoachService extends ChangeNotifier {
       'riskLevel': _riskLevel,
     }),);
 
+    if (_buildFocus != 'auto') {
+      _client.send(jsonEncode({
+        'event': 'SET_BUILD_FOCUS',
+        'buildFocus': _buildFocus,
+      }),);
+    }
+
+    if (_preferPassiveItems) {
+      _client.send(jsonEncode({
+        'event': 'SET_PREFER_PASSIVE_ITEMS',
+        'preferPassiveItems': _preferPassiveItems,
+      }),);
+    }
+
     if (_activeSummonerName != null && _activeSummonerName!.isNotEmpty) {
       _client.send(jsonEncode({
         'event': 'SET_SUMMONER',
@@ -194,6 +224,42 @@ class CoachService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sets the combat/build focus ('auto' | 'burst' | 'dps' | 'bruiser' | 'split').
+  void setBuildFocus(String focus) {
+    if (_buildFocus == focus) return;
+    _buildFocus = focus;
+    unawaited(_storage?.setBuildFocus(focus));
+    if (isConnected) {
+      _client.send(jsonEncode({
+        'event': 'SET_BUILD_FOCUS',
+        'buildFocus': focus,
+      }),);
+    }
+    notifyListeners();
+  }
+
+  /// Toggles passive/stat-stick item preference over active items.
+  void setPreferPassiveItems({required bool prefer}) {
+    if (_preferPassiveItems == prefer) return;
+    _preferPassiveItems = prefer;
+    unawaited(_storage?.setPreferPassiveItems(value: prefer));
+    if (isConnected) {
+      _client.send(jsonEncode({
+        'event': 'SET_PREFER_PASSIVE_ITEMS',
+        'preferPassiveItems': prefer,
+      }),);
+    }
+    notifyListeners();
+  }
+
+  /// Toggles Challenger Pro / Zen HUD mode.
+  void setProMode({required bool enabled}) {
+    if (_proMode == enabled) return;
+    _proMode = enabled;
+    unawaited(_storage?.setProMode(value: enabled));
+    notifyListeners();
+  }
+
   void loadModels(String provider, String apiKey) {
     if (!isConnected) return;
     _isLoadingModels = true;
@@ -239,11 +305,22 @@ class CoachService extends ChangeNotifier {
       final msg = WsMessage.fromJson(json);
       _lastEvent = msg.event;
 
+      if (msg.tacticalInsights != null) {
+        _tacticalInsights = msg.tacticalInsights;
+      }
+      if (msg.playerProfile != null) {
+        _playerProfile = msg.playerProfile;
+      }
+      if (msg.postGameAutopsy != null) {
+        _postGameAutopsy = msg.postGameAutopsy;
+      }
+
       switch (msg.event) {
         case 'GAME_INACTIVE':
           _gameActive = false;
           _gameState = null;
           _recommendation = null;
+          _tacticalInsights = null;
           _isAnalyzing = false;
           _triggerEvent = null;
         case 'RECOMMENDATION_UPDATE':

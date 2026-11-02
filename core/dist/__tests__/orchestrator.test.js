@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const orchestrator_1 = require("../orchestrator");
 const eventDetector_1 = require("../eventDetector");
+const recommendationEngine_1 = require("../recommendationEngine");
 const fixtures_1 = require("./fixtures");
 function setup(overrides = {}) {
     const broadcasts = [];
@@ -22,7 +23,7 @@ function setup(overrides = {}) {
             },
         }),
     };
-    const orchestrator = new orchestrator_1.BridgeOrchestrator(wsServer, new eventDetector_1.EventDetector(), overrides.hasLlm === false ? null : llmProvider, { summonerName: "TestPlayer", llmCooldownMs: 60_000 }, overrides.clock ?? (() => 1000));
+    const orchestrator = new orchestrator_1.BridgeOrchestrator(wsServer, new eventDetector_1.EventDetector(), new recommendationEngine_1.RecommendationEngine(), overrides.hasLlm === false ? null : llmProvider, { summonerName: "TestPlayer", llmCooldownMs: 60_000 }, overrides.clock ?? (() => 1000));
     return { orchestrator, wsServer, llmProvider, broadcasts };
 }
 describe("BridgeOrchestrator", () => {

@@ -42,6 +42,21 @@ class StorageService {
   Future<void> setRiskLevel(String value) =>
       _prefs.setString('riskLevel', value);
 
+  /// Combat/build focus: 'auto' | 'burst' | 'dps' | 'bruiser' | 'split'.
+  String get buildFocus => _prefs.getString('buildFocus') ?? 'auto';
+  Future<void> setBuildFocus(String value) =>
+      _prefs.setString('buildFocus', value);
+
+  /// Whether to prefer passive/stat-stick items over active-button items.
+  bool get preferPassiveItems => _prefs.getBool('preferPassiveItems') ?? false;
+  Future<void> setPreferPassiveItems({required bool value}) =>
+      _prefs.setBool('preferPassiveItems', value);
+
+  /// Challenger Pro / Zen HUD mode (hides redundant native LoL HUD stats).
+  bool get proMode => _prefs.getBool('proMode') ?? false;
+  Future<void> setProMode({required bool value}) =>
+      _prefs.setBool('proMode', value);
+
   // --- Appearance ---
   String? get themeMode => _prefs.getString('themeMode');
   Future<void> setThemeMode(String value) =>

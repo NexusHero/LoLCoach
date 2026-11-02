@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClaudeProvider = exports.CLAUDE_DEFAULT_MODEL = void 0;
 const sdk_1 = require("@anthropic-ai/sdk");
 const llmProvider_js_1 = require("../llmProvider.js");
+const types_js_1 = require("../types.js");
 const logger_js_1 = require("../logger.js");
 exports.CLAUDE_DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 class ClaudeProvider {
@@ -20,7 +21,7 @@ class ClaudeProvider {
             displayName: m.display_name ?? m.id,
         }));
     }
-    async getAnalysis(state) {
+    async getAnalysis(state, risk = types_js_1.DEFAULT_RISK_LEVEL, options) {
         try {
             const response = await this.client.messages.create({
                 model: this.model,
@@ -33,7 +34,7 @@ class ClaudeProvider {
                     },
                 ],
                 messages: [
-                    { role: "user", content: await (0, llmProvider_js_1.buildUserPrompt)(state) },
+                    { role: "user", content: await (0, llmProvider_js_1.buildUserPrompt)(state, risk, options) },
                 ],
             });
             if (response.content.length === 0)

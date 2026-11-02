@@ -1,11 +1,21 @@
 import { singleton } from "tsyringe";
 import type { LlmProvider } from "./llmProvider.js";
 import { CacheService } from "./cacheService.js";
-import type { ParsedGameState, ItemRecommendation, WsTokenUsage, RiskLevel } from "./types.js";
-import { DEFAULT_RISK_LEVEL } from "./types.js";
+import type {
+  ParsedGameState,
+  ItemRecommendation,
+  WsTokenUsage,
+  RiskLevel,
+  BuildFocus,
+  RecommendedItem,
+} from "./types.js";
+import { DEFAULT_RISK_LEVEL, DEFAULT_BUILD_FOCUS } from "./types.js";
 import type { IRecommendationEngine } from "./interfaces.js";
 import { Logger } from "./logger.js";
 import { ddragon } from "./ddragonService.js";
+import { PASSIVE_ITEM_ALTERNATIVES } from "./tacticalAnalyzer.js";
+
+const SECONDARY_TRIGGER_COOLDOWN_SEC = 45;
 
 export interface RecommendationCallbacks {
   onLlmBudgetExceeded: (sessionTokens: number, budget: number) => void;
@@ -21,12 +31,39 @@ export class RecommendationEngine implements IRecommendationEngine {
   private sessionOutputTokens = 0;
   private tokenBudget = 0;
   private riskLevel: RiskLevel = DEFAULT_RISK_LEVEL;
+  private buildFocus: BuildFocus = DEFAULT_BUILD_FOCUS;
+  private preferPassiveItems = false;
+  private habitWarnings: string[] = [];
+  private lastRecommendedItems: RecommendedItem[] = [];
+  private lastLlmGameTime = -999;
 
   setRiskLevel(level: RiskLevel): void {
     if (this.riskLevel !== level) {
       Logger.info(`[Engine] Risk level changed: ${this.riskLevel} → ${level}`);
       this.riskLevel = level;
     }
+  }
+
+  setBuildFocus(focus: BuildFocus): void {
+    if (this.buildFocus !== focus) {
+      Logger.info(`[Engine] Build focus changed: ${this.buildFocus} → ${focus}`);
+      this.buildFocus = focus;
+    }
+  }
+
+  setPreferPassiveItems(prefer: boolean): void {
+    if (this.preferPassiveItems !== prefer) {
+      Logger.info(`[Engine] Prefer passive items changed: ${this.preferPassiveItems} → ${prefer}`);
+      this.preferPassiveItems = prefer;
+    }
+  }
+
+  setHabitWarnings(warnings: string[]): void {
+    this.habitWarnings = warnings;
+  }
+
+  getLastRecommendedItems(): RecommendedItem[] {
+    return this.lastRecommendedItems;
   }
 
   setLlmProvider(provider: LlmProvider | null): void {
@@ -46,6 +83,37 @@ export class RecommendationEngine implements IRecommendationEngine {
     this.cache.clear();
     this.sessionInputTokens = 0;
     this.sessionOutputTokens = 0;
+    this.lastRecommendedItems = [];
+    this.lastLlmGameTime = -999;
+  }
+
+  private shouldTriggerLlm(state: ParsedGameState, eventType: string): boolean {
+    if (
+      eventType === "GAME_STARTED" ||
+      eventType === "PLAYER_DIED" ||
+      eventType === "MANUAL"
+    ) {
+      return true;
+    }
+
+    const elapsedGameSec = state.gameTime - this.lastLlmGameTime;
+    if (elapsedGameSec < SECONDARY_TRIGGER_COOLDOWN_SEC) {
+      return false;
+    }
+
+    if (eventType === "HIGH_GOLD_REACHED") {
+      return state.activePlayer.currentGold >= 1400;
+    }
+
+    if (eventType === "OBJECTIVE_SETUP_WINDOW") {
+      return true;
+    }
+
+    if (eventType === "ITEM_PURCHASED") {
+      return state.enemies.some((e) => e.items.some((i) => i.price >= 2600));
+    }
+
+    return false;
   }
 
   async process(
@@ -57,7 +125,7 @@ export class RecommendationEngine implements IRecommendationEngine {
     const useLlm =
       this.llmProvider !== null &&
       hasClients &&
-      (eventType === "GAME_STARTED" || eventType === "PLAYER_DIED" || eventType === "MANUAL");
+      this.shouldTriggerLlm(state, eventType);
 
     if (!useLlm) return;
 
@@ -67,7 +135,12 @@ export class RecommendationEngine implements IRecommendationEngine {
       return;
     }
 
-    const cacheKey = this.cache.buildKey(state, this.riskLevel);
+    const cacheKey = this.cache.buildKey(
+      state,
+      this.riskLevel,
+      this.buildFocus,
+      this.preferPassiveItems,
+    );
     const cached = this.cache.get(cacheKey);
 
     let llmAnalysis: Awaited<ReturnType<LlmProvider["getAnalysis"]>>;
@@ -76,7 +149,18 @@ export class RecommendationEngine implements IRecommendationEngine {
       llmAnalysis = cached;
     } else {
       try {
-        llmAnalysis = await this.llmProvider!.getAnalysis(state, this.riskLevel);
+        const hasExtraOptions =
+          this.buildFocus !== DEFAULT_BUILD_FOCUS ||
+          this.preferPassiveItems ||
+          this.habitWarnings.length > 0;
+        llmAnalysis = hasExtraOptions
+          ? await this.llmProvider!.getAnalysis(state, this.riskLevel, {
+              buildFocus: this.buildFocus,
+              preferPassiveItems: this.preferPassiveItems,
+              habitWarnings: this.habitWarnings,
+            })
+          : await this.llmProvider!.getAnalysis(state, this.riskLevel);
+        this.lastLlmGameTime = state.gameTime;
         if (llmAnalysis.tokenUsage) {
           this.sessionInputTokens += llmAnalysis.tokenUsage.input;
           this.sessionOutputTokens += llmAnalysis.tokenUsage.output;
@@ -92,14 +176,29 @@ export class RecommendationEngine implements IRecommendationEngine {
 
     const ownedItemIds = new Set(state.localPlayer.items.map((i) => i.itemID));
     const seenIds = new Set<number>();
+    const rawItems = (llmAnalysis.situationalItems ?? []).map((i) => {
+      if (this.preferPassiveItems && PASSIVE_ITEM_ALTERNATIVES[i.id]) {
+        const alt = PASSIVE_ITEM_ALTERNATIVES[i.id];
+        return { ...i, id: alt.id, name: alt.name, reason: alt.reason };
+      }
+      return i;
+    });
+
+    const filteredItems = rawItems.filter((i) => {
+      if (ownedItemIds.has(i.id)) return false;
+      if (!ddragon.getItemInfo(i.id)) {
+        Logger.warn(`[Rec] Dropping hallucinated item id=${i.id} name="${i.name}"`);
+        return false;
+      }
+      if (seenIds.has(i.id)) return false;
+      seenIds.add(i.id);
+      return true;
+    });
+
+    this.lastRecommendedItems = filteredItems;
+
     const rec: ItemRecommendation = {
-      items: (llmAnalysis.situationalItems ?? []).filter((i) => {
-        if (ownedItemIds.has(i.id)) return false;
-        if (!ddragon.getItemInfo(i.id)) { Logger.warn(`[Rec] Dropping hallucinated item id=${i.id} name="${i.name}"`); return false; }
-        if (seenIds.has(i.id)) return false;
-        seenIds.add(i.id);
-        return true;
-      }),
+      items: filteredItems,
       reasoning: llmAnalysis.reasoning,
       strategy: llmAnalysis.strategy,
       source: "llm",

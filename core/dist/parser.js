@@ -31,5 +31,6 @@ function parseGameState(raw, localSummonerName) {
         allies,
         enemies,
         activePlayer: raw.activePlayer,
+        ...(raw.events?.Events ? { mapEvents: raw.events.Events } : {}),
     });
 }

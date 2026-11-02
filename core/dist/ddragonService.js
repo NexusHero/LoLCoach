@@ -66,6 +66,9 @@ class DDragonService {
     getItemInfo(id) {
         return this.items[id];
     }
+    getAllItems() {
+        return this.items;
+    }
     /** Returns Riot's official champion tags (e.g. ["Mage","Assassin"], ["Tank"], ["Marksman"]). */
     getChampionTags(displayName) {
         return this.championTags[displayName] ?? [];
@@ -87,6 +90,10 @@ class DDragonService {
                 w: champ.spells[1].name,
                 e: champ.spells[2].name,
                 r: champ.spells[3].name,
+                ...(champ.spells[0].cooldown ? { qCooldown: champ.spells[0].cooldown } : {}),
+                ...(champ.spells[1].cooldown ? { wCooldown: champ.spells[1].cooldown } : {}),
+                ...(champ.spells[2].cooldown ? { eCooldown: champ.spells[2].cooldown } : {}),
+                ...(champ.spells[3].cooldown ? { rCooldown: champ.spells[3].cooldown } : {}),
             };
             this.champions[displayName] = abilities;
             this.saveCache().catch(() => { });
@@ -106,10 +113,17 @@ class DDragonService {
             if (!item.name || item.inStore === false)
                 continue;
             const stats = this.formatStats(item.stats ?? {});
+            const fromIds = item.from?.map(Number).filter((n) => !Number.isNaN(n) && n > 0);
+            const intoIds = item.into?.map(Number).filter((n) => !Number.isNaN(n) && n > 0);
             this.items[Number(id)] = {
                 name: item.name,
                 stats,
                 plaintext: item.plaintext ?? "",
+                ...(item.gold?.total !== undefined ? { totalGold: item.gold.total } : {}),
+                ...(item.gold?.base !== undefined ? { baseGold: item.gold.base } : {}),
+                ...(fromIds?.length ? { from: fromIds } : {}),
+                ...(intoIds?.length ? { into: intoIds } : {}),
+                ...(item.tags?.length ? { tags: item.tags } : {}),
             };
         }
     }

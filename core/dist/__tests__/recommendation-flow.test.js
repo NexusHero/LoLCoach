@@ -8,6 +8,7 @@ const ws_2 = __importDefault(require("ws"));
 const wsServer_1 = require("../wsServer");
 const orchestrator_1 = require("../orchestrator");
 const eventDetector_1 = require("../eventDetector");
+const recommendationEngine_1 = require("../recommendationEngine");
 const messageRouter_1 = require("../messageRouter");
 const fixtures_1 = require("./fixtures");
 // Prevent SDK imports inside the real llmProvider module from loading.
@@ -57,8 +58,9 @@ async function setupBridge(llmProvider = null, tokenBudget) {
     await new Promise((resolve) => wss.once("listening", resolve));
     const port = wss.address().port;
     let _router;
-    const wsServer = new wsServer_1.BridgeWsServer(wss, (_ws, msg) => _router.handle(_ws, msg));
-    const orchestrator = new orchestrator_1.BridgeOrchestrator(wsServer, new eventDetector_1.EventDetector(), llmProvider, { summonerName: "TestPlayer", llmCooldownMs: 0, tokenBudget });
+    const wsServer = new wsServer_1.BridgeWsServer(wss);
+    wsServer.setMessageHandler((_ws, msg) => _router.handle(_ws, msg));
+    const orchestrator = new orchestrator_1.BridgeOrchestrator(wsServer, new eventDetector_1.EventDetector(), new recommendationEngine_1.RecommendationEngine(), llmProvider, { summonerName: "TestPlayer", llmCooldownMs: 0, tokenBudget });
     _router = new messageRouter_1.MessageRouter(orchestrator);
     return { wss, port, orchestrator };
 }

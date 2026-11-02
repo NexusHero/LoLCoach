@@ -1,6 +1,6 @@
 import { injectable } from "tsyringe";
-import type { ParsedGameState, RiskLevel } from "./types.js";
-import { DEFAULT_RISK_LEVEL } from "./types.js";
+import type { ParsedGameState, RiskLevel, BuildFocus } from "./types.js";
+import { DEFAULT_RISK_LEVEL, DEFAULT_BUILD_FOCUS } from "./types.js";
 import type { LlmAnalysis } from "./llmProvider.js";
 import { getGamePhase } from "./stateMinifier.js";
 
@@ -33,7 +33,12 @@ export class CacheService {
     this.store.clear();
   }
 
-  buildKey(state: ParsedGameState, risk: RiskLevel = DEFAULT_RISK_LEVEL): string {
+  buildKey(
+    state: ParsedGameState,
+    risk: RiskLevel = DEFAULT_RISK_LEVEL,
+    buildFocus: BuildFocus = DEFAULT_BUILD_FOCUS,
+    preferPassive = false,
+  ): string {
     const goldBucket = Math.floor(state.activePlayer.currentGold / 500);
     const phase = getGamePhase(state.gameTime);
     const killsBucket = Math.floor(state.localPlayer.scores.kills / 3);
@@ -41,6 +46,10 @@ export class CacheService {
     // meaningfully, so consecutive deaths must not collapse into one cache entry.
     const deaths = state.localPlayer.scores.deaths;
     const enemyNames = state.enemies.map((e) => e.championName).sort().join(",");
+    const enemyCoreItems = state.enemies
+      .flatMap((e) => e.items.filter((i) => i.price >= 2400).map((i) => i.itemID))
+      .sort()
+      .join(",");
     const myItems = state.localPlayer.items.map((i) => i.itemID).sort().join(",");
     return [
       state.localPlayer.championName,
@@ -49,7 +58,10 @@ export class CacheService {
       `k${killsBucket}`,
       `d${deaths}`,
       `r:${risk}`,
+      `f:${buildFocus}`,
+      `p:${preferPassive ? 1 : 0}`,
       `e:${enemyNames}`,
+      `eitems:${enemyCoreItems}`,
       `myitems:${myItems}`,
     ].join("|");
   }

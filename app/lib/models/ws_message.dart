@@ -1,5 +1,6 @@
 import 'package:lol_coach/models/game_state.dart';
 import 'package:lol_coach/models/recommendation.dart';
+import 'package:lol_coach/models/tactical_insights.dart';
 import 'package:lol_coach/models/token_usage.dart';
 
 class WsMessage {
@@ -8,6 +9,9 @@ class WsMessage {
     required this.timestamp,
     this.gameState,
     this.recommendation,
+    this.tacticalInsights,
+    this.playerProfile,
+    this.postGameAutopsy,
     this.error,
     this.tokenUsage,
     this.sessionInputTokens,
@@ -28,6 +32,21 @@ class WsMessage {
                 json['recommendation'] as Map<String, dynamic>,
               )
             : null,
+        tacticalInsights: json['tacticalInsights'] != null
+            ? TacticalInsights.fromJson(
+                json['tacticalInsights'] as Map<String, dynamic>,
+              )
+            : null,
+        playerProfile: json['playerProfile'] != null
+            ? PlayerHabitProfile.fromJson(
+                json['playerProfile'] as Map<String, dynamic>,
+              )
+            : null,
+        postGameAutopsy: json['postGameAutopsy'] != null
+            ? PostGameAutopsy.fromJson(
+                json['postGameAutopsy'] as Map<String, dynamic>,
+              )
+            : null,
         error: json['error'] as String?,
         tokenUsage: json['tokenUsage'] != null
             ? TokenUsage.fromJson(json['tokenUsage'] as Map<String, dynamic>)
@@ -41,6 +60,9 @@ class WsMessage {
   final int timestamp;
   final ParsedGameState? gameState;
   final ItemRecommendation? recommendation;
+  final TacticalInsights? tacticalInsights;
+  final PlayerHabitProfile? playerProfile;
+  final PostGameAutopsy? postGameAutopsy;
   final String? error;
   final TokenUsage? tokenUsage;
   final int? sessionInputTokens;

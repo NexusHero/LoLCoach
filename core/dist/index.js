@@ -1,9 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+// reflect-metadata must be imported once, before any decorated class is
+// loaded — tsyringe reads constructor parameter metadata it emits.
+require("reflect-metadata");
 require("dotenv/config");
 const ws_1 = require("ws");
+const tsyringe_1 = require("tsyringe");
 const poller_js_1 = require("./poller.js");
 const eventDetector_js_1 = require("./eventDetector.js");
+const recommendationEngine_js_1 = require("./recommendationEngine.js");
 const wsServer_js_1 = require("./wsServer.js");
 const orchestrator_js_1 = require("./orchestrator.js");
 const messageRouter_js_1 = require("./messageRouter.js");
@@ -12,6 +17,7 @@ const ddragonService_js_1 = require("./ddragonService.js");
 const secretManager_js_1 = require("./secretManager.js");
 const config_js_1 = require("./config.js");
 const logger_js_1 = require("./logger.js");
+const tokens_js_1 = require("./tokens.js");
 // DDragon im Hintergrund initialisieren — kein blocking start
 ddragonService_js_1.ddragon.init().catch((err) => logger_js_1.Logger.error("[Main] DDragon init error:", err));
 const LOCAL_SUMMONER = process.env.SUMMONER_NAME ?? "";
@@ -43,19 +49,49 @@ if (parentPidArg) {
 }
 const secret = (0, secretManager_js_1.loadOrCreateSecret)();
 logger_js_1.Logger.info(`[Main] Bridge secret stored at: ${(0, secretManager_js_1.secretFilePath)()}`);
-// Closure trick: wsServer needs orchestrator reference before orchestrator is constructed
-let orchestrator;
-let messageRouter;
-const wsServer = new wsServer_js_1.BridgeWsServer(new ws_1.WebSocketServer({
-    host: config_js_1.config.ws.host,
-    port: WS_PORT,
-    verifyClient: ({ req }) => req.headers["authorization"] === `Bearer ${secret}`,
-}), (_ws, message) => messageRouter.handle(_ws, message));
-orchestrator = new orchestrator_js_1.BridgeOrchestrator(wsServer, new eventDetector_js_1.EventDetector(), null, {
-    summonerName: LOCAL_SUMMONER,
-    llmCooldownMs: DEFAULT_LLM_COOLDOWN_MS,
+// --- DI container registrations ---
+// tsyringe resolves the acyclic part of the graph (EventDetector,
+// RecommendationEngine, BridgeOrchestrator, MessageRouter). Interfaces,
+// unions and external (non-decorated) classes can't be resolved by
+// reflected type, so they get an explicit value token registered here.
+tsyringe_1.container.register(tokens_js_1.ORCHESTRATOR_CONFIG_TOKEN, {
+    useValue: {
+        summonerName: LOCAL_SUMMONER,
+        llmCooldownMs: DEFAULT_LLM_COOLDOWN_MS,
+    },
 });
-messageRouter = new messageRouter_js_1.MessageRouter(orchestrator);
+// tsyringe's `useValue` provider treats `null`/`undefined` as "not a value"
+// (a `!= undefined` check) and would mis-register this as a class to
+// construct. `useFactory` has no such check, so it's the safe way to
+// register a token whose initial value is null.
+tsyringe_1.container.register(tokens_js_1.LLM_PROVIDER_TOKEN, { useFactory: () => null });
+tsyringe_1.container.register(tokens_js_1.CLOCK_TOKEN, { useValue: Date.now });
+tsyringe_1.container.register(tokens_js_1.WSS_TOKEN, {
+    useValue: new ws_1.WebSocketServer({
+        host: config_js_1.config.ws.host,
+        port: WS_PORT,
+        verifyClient: ({ req }) => req.headers["authorization"] === `Bearer ${secret}`,
+    }),
+});
+// BridgeOrchestrator depends on interfaces (DIP), not the concrete classes.
+// `useToken` is an alias, not a separate registration — resolving the
+// interface token redirects to `container.resolve(BridgeWsServer)` etc.,
+// which (being @singleton()) returns the SAME cached instance used below.
+// Registering these as `useClass` instead would silently construct a
+// second, disconnected singleton per interface — exactly the bug already
+// fixed once for BridgeWsServer's connection-listener duplication.
+tsyringe_1.container.register(tokens_js_1.WS_BROADCASTER_TOKEN, { useToken: wsServer_js_1.BridgeWsServer });
+tsyringe_1.container.register(tokens_js_1.EVENT_DETECTOR_TOKEN, { useToken: eventDetector_js_1.EventDetector });
+tsyringe_1.container.register(tokens_js_1.RECOMMENDATION_ENGINE_TOKEN, { useToken: recommendationEngine_js_1.RecommendationEngine });
+// BridgeWsServer <-> MessageRouter is a genuine cycle (the router needs the
+// orchestrator, which needs the wsServer, which needs to call the router on
+// incoming messages) — no DI container resolves a true constructor cycle.
+// Broken here via method injection: construct both through the container,
+// then wire the one circular edge explicitly.
+const wsServer = tsyringe_1.container.resolve(wsServer_js_1.BridgeWsServer);
+const orchestrator = tsyringe_1.container.resolve(orchestrator_js_1.BridgeOrchestrator);
+const messageRouter = tsyringe_1.container.resolve(messageRouter_js_1.MessageRouter);
+wsServer.setMessageHandler((ws, message) => messageRouter.handle(ws, message));
 // Backward compatible: use ANTHROPIC_API_KEY from .env if present
 if (process.env.ANTHROPIC_API_KEY) {
     (0, llmProvider_js_1.createLlmProvider)("claude", process.env.ANTHROPIC_API_KEY).then((provider) => {
@@ -65,10 +101,12 @@ if (process.env.ANTHROPIC_API_KEY) {
 }
 const poller = new poller_js_1.LiveClientPoller((data) => orchestrator.handleGameData(data), (active) => {
     if (!active) {
-        orchestrator.resetDetector();
+        const autopsy = orchestrator.resetDetector();
         wsServer.broadcast({
             event: "GAME_INACTIVE",
             timestamp: Date.now(),
+            ...(autopsy ? { postGameAutopsy: autopsy } : {}),
+            playerProfile: orchestrator.getPlayerProfile(),
         });
     }
 });

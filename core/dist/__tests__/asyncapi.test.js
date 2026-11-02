@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const v3_1 = require("zod/v3");
 const orchestrator_1 = require("../orchestrator");
 const eventDetector_1 = require("../eventDetector");
+const recommendationEngine_1 = require("../recommendationEngine");
 const fixtures_1 = require("./fixtures");
 // Zod schemas derived from asyncapi.yml — these are the contract
 const BaseMessageSchema = v3_1.z.object({
@@ -78,6 +79,7 @@ const GameStateMessageSchema = BaseMessageSchema.extend({
 });
 const RecommendationMessageSchema = GameStateMessageSchema.extend({
     recommendation: ItemRecommendationSchema,
+    triggerEvent: v3_1.z.string().optional(),
 });
 describe("AsyncAPI Contract: broadcast messages match schema", () => {
     function makeMockLlmProvider() {
@@ -98,7 +100,7 @@ describe("AsyncAPI Contract: broadcast messages match schema", () => {
             clientCount: 1,
             close: jest.fn(),
         };
-        const orchestrator = new orchestrator_1.BridgeOrchestrator(wsServer, new eventDetector_1.EventDetector(), llmProvider, { summonerName: "TestPlayer", llmCooldownMs: 0 }, () => Date.now());
+        const orchestrator = new orchestrator_1.BridgeOrchestrator(wsServer, new eventDetector_1.EventDetector(), new recommendationEngine_1.RecommendationEngine(), llmProvider, { summonerName: "TestPlayer", llmCooldownMs: 0 }, () => Date.now());
         return { orchestrator, broadcasts };
     }
     it("broadcast_GameStartedEvent_ConformsToGameStateMessageSchema", async () => {

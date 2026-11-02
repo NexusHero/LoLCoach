@@ -77,14 +77,16 @@ describe("BridgeWsServer", () => {
     describe("message handling", () => {
         it("onMessage_ClientSendsValidJson_ParsesAndCallsHandler", () => {
             const handler = jest.fn();
-            const serverWithHandler = new wsServer_1.BridgeWsServer(mockWss, handler);
+            const serverWithHandler = new wsServer_1.BridgeWsServer(mockWss);
+            serverWithHandler.setMessageHandler(handler);
             const ws = new MockWebSocket();
             mockWss.emit("connection", ws, fakeReq());
             ws.emit("message", Buffer.from(JSON.stringify({ event: "TRIGGER_ANALYSIS" })));
             expect(handler).toHaveBeenCalledWith(ws, { event: "TRIGGER_ANALYSIS" });
         });
         it("onMessage_ClientSendsMalformedJson_DoesNotThrow", () => {
-            const serverWithHandler = new wsServer_1.BridgeWsServer(mockWss, jest.fn());
+            const serverWithHandler = new wsServer_1.BridgeWsServer(mockWss);
+            serverWithHandler.setMessageHandler(jest.fn());
             const ws = new MockWebSocket();
             mockWss.emit("connection", ws, fakeReq());
             expect(() => {
@@ -100,7 +102,8 @@ describe("BridgeWsServer", () => {
         });
         it("onMessage_SetSummonerMessage_PassesParsedObjectToHandler", () => {
             const handler = jest.fn();
-            const serverWithHandler = new wsServer_1.BridgeWsServer(mockWss, handler);
+            const serverWithHandler = new wsServer_1.BridgeWsServer(mockWss);
+            serverWithHandler.setMessageHandler(handler);
             const ws = new MockWebSocket();
             mockWss.emit("connection", ws, fakeReq());
             const msg = { event: "SET_SUMMONER", summonerName: "Faker" };

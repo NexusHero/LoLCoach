@@ -82,6 +82,37 @@ describe("buildUserPrompt", () => {
         expect(prompt).toContain("Q=Razor Shuriken");
         expect(prompt).toContain("R=Death Mark");
     });
+    it("buildUserPrompt_EnemyHasSummonerSpells_SpellsInPrompt", async () => {
+        const state = (0, fixtures_1.makeGameState)({
+            localPlayer: (0, fixtures_1.makePlayer)({ championName: "Ahri", position: "MID" }),
+            enemies: [(0, fixtures_1.makePlayer)({
+                    championName: "Zed",
+                    position: "MID",
+                    team: "CHAOS",
+                    summonerSpells: {
+                        summonerSpellOne: { displayName: "Flash" },
+                        summonerSpellTwo: { displayName: "Ignite" },
+                    },
+                })],
+        });
+        const prompt = await (0, llmProvider_1.buildUserPrompt)(state);
+        expect(prompt).toContain("{Flash, Ignite}");
+    });
+    it("buildUserPrompt_RiskyLevel_ContainsAggressiveDirective", async () => {
+        const state = (0, fixtures_1.makeGameState)();
+        const prompt = await (0, llmProvider_1.buildUserPrompt)(state, "risky");
+        expect(prompt).toContain("Playstyle: AGGRESSIVE");
+    });
+    it("buildUserPrompt_SafeLevel_ContainsCautiousDirective", async () => {
+        const state = (0, fixtures_1.makeGameState)();
+        const prompt = await (0, llmProvider_1.buildUserPrompt)(state, "safe");
+        expect(prompt).toContain("Playstyle: SAFE");
+    });
+    it("buildUserPrompt_DefaultLevel_ContainsBalancedDirective", async () => {
+        const state = (0, fixtures_1.makeGameState)();
+        const prompt = await (0, llmProvider_1.buildUserPrompt)(state);
+        expect(prompt).toContain("Playstyle: BALANCED");
+    });
     it("buildUserPrompt_NoOpponent_ShowsUnknown", async () => {
         const state = (0, fixtures_1.makeGameState)({
             localPlayer: (0, fixtures_1.makePlayer)({ position: "TOP" }),
