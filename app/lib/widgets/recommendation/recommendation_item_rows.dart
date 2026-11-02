@@ -4,6 +4,7 @@ import 'package:lol_coach/models/tactical_insights.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/badge.dart';
+import 'package:lol_coach/widgets/common/interactive_cooldown_bar.dart';
 import 'package:lol_coach/widgets/common/item_slot.dart';
 
 /// The headline item, rendered in a tinted rounded row with a subtle glow.
@@ -203,7 +204,7 @@ class NextBestBuyBanner extends StatelessWidget {
   }
 }
 
-/// Key-Threat-Diff + Compact Q/W/E/R Cooldown Bar for the lane opponent.
+/// Key-Threat-Diff + Interactive 1-Click Q/W/E/R & Summoner Cooldown Bar.
 class EnemyCooldownsStrip extends StatelessWidget {
   const EnemyCooldownsStrip({required this.cooldowns, super.key});
 
@@ -235,17 +236,19 @@ class EnemyCooldownsStrip extends StatelessWidget {
                   ),
                 ),
               ),
+              Text(
+                '${cooldowns.championName} · 1-CLICK CD',
+                style: AppTextStyles.micro.copyWith(
+                  color: colors.textDisabled,
+                  fontSize: 9,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            '${cooldowns.championName} CDs · '
-            'Q: ${cooldowns.q}s · W: ${cooldowns.w}s · '
-            'E: ${cooldowns.e}s · R: ${cooldowns.r}s',
-            style: AppTextStyles.mono.copyWith(
-              color: colors.textSecondary,
-              fontSize: 11,
-            ),
+          const SizedBox(height: 8),
+          InteractiveCooldownGrid(
+            cooldowns: cooldowns,
+            compact: true,
           ),
         ],
       ),

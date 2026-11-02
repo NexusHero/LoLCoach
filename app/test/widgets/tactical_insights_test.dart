@@ -115,6 +115,11 @@ void main() {
             w: 16,
             e: 4,
             r: 85,
+            keyThreatSpell: 'W',
+            summonerSpells: [
+              EnemySummonerCooldown(name: 'Flash', cooldown: 254),
+              EnemySummonerCooldown(name: 'Ignite', cooldown: 153),
+            ],
             keyThreatSummary: 'His W (16s) vs your W (18s) -> 2s vulnerable!',
           ),
         );
@@ -139,10 +144,20 @@ void main() {
           find.text('His W (16s) vs your W (18s) -> 2s vulnerable!'),
           findsOneWidget,
         );
-        expect(
-          find.text('Zed CDs · Q: 5s · W: 16s · E: 4s · R: 85s'),
-          findsOneWidget,
-        );
+        expect(find.text('16s'), findsOneWidget);
+        expect(find.text('FLASH'), findsOneWidget);
+        expect(find.text('4:14'), findsOneWidget);
+
+        // 1-Click on W starts live countdown ("W CD") and ticks down after 1s
+        await tester.tap(find.text('16s'));
+        await tester.pump(const Duration(seconds: 1));
+        expect(find.text('W CD'), findsOneWidget);
+        expect(find.text('15s'), findsOneWidget);
+
+        // Second click resets the timer back to ready ("W" / "16s")
+        await tester.tap(find.text('15s'));
+        await tester.pump();
+        expect(find.text('16s'), findsOneWidget);
       },
     );
 

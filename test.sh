@@ -257,6 +257,7 @@ run_app() {
     test/services
     test/screens
     test/widgets/recommendation_panel_test.dart
+    test/widgets/tactical_insights_test.dart
     test/widgets/connection_form_test.dart
   )
   local test_dirs=()

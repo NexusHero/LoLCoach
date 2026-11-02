@@ -6,8 +6,8 @@ import 'package:lol_coach/models/tactical_insights.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/build_focus_selector.dart';
-import 'package:lol_coach/widgets/common/champ_avatar.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
+import 'package:lol_coach/widgets/common/interactive_cooldown_bar.dart';
 import 'package:lol_coach/widgets/common/item_slot.dart';
 
 /// Ultra-focused 0.2s-glance Challenger / High-Elo HUD mode.
@@ -15,7 +15,7 @@ import 'package:lol_coach/widgets/common/item_slot.dart';
 /// 10-player Tab scoreboard) and surfaces only the 4 invisible high-elo edges:
 /// 1. Immediate Play + Component Breakpoint Math
 /// 2. Pure Icon Build Strip + BuildFocus Quick-Switch
-/// 3. Opponent Q/W/E/R Cooldown Boxes + Vulnerability Window
+/// 3. Opponent Q/W/E/R + Summoner Spell Cooldown Boxes (1-Click Track)
 /// 4. CS/m Tempo Gauge vs Role Benchmark
 class ChallengerProHud extends StatelessWidget {
   const ChallengerProHud({
@@ -95,8 +95,7 @@ class ChallengerProHud extends StatelessWidget {
                       spacing: 12,
                       runSpacing: 10,
                       children: [
-                        for (final item in items)
-                          _ProItemTile(item: item),
+                        for (final item in items) _ProItemTile(item: item),
                       ],
                     ),
                   ],
@@ -119,7 +118,7 @@ class ChallengerProHud extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (cds != null)
-              _ProCooldownCard(
+              ProCooldownCard(
                 cooldowns: cds,
                 counterPlay: counterPlay,
               ),
@@ -225,120 +224,6 @@ class _ProItemTile extends StatelessWidget {
           ItemSlot(itemId: item.id, displayName: item.name, size: 38),
           const SizedBox(width: 10),
           Text(item.name, style: AppTextStyles.bodyBold),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProCooldownCard extends StatelessWidget {
-  const _ProCooldownCard({
-    required this.cooldowns,
-    this.counterPlay,
-  });
-
-  final EnemyCooldowns cooldowns;
-  final String? counterPlay;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final spells = <(String, int)>[
-      ('Q', cooldowns.q),
-      ('W', cooldowns.w),
-      ('E', cooldowns.e),
-      ('R', cooldowns.r),
-    ];
-
-    return GameCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              ChampAvatar(
-                name: cooldowns.championName,
-                isDead: false,
-                size: 28,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  '${cooldowns.championName.toUpperCase()} COOLDOWNS '
-                  '(LV ${cooldowns.level} · ${cooldowns.abilityHaste} AH)',
-                  style: AppTextStyles.eyebrow.copyWith(color: colors.cyan),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              for (var i = 0; i < spells.length; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: colors.surface2,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: colors.border),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          spells[i].$1,
-                          style: AppTextStyles.micro.copyWith(
-                            color: colors.textDisabled,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${spells[i].$2}s',
-                          style: AppTextStyles.mono.copyWith(
-                            color: colors.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: colors.surface2,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: colors.cyan.withValues(alpha: 0.35)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.bolt_rounded, size: 16, color: colors.cyan),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    cooldowns.keyThreatSummary,
-                    style: AppTextStyles.bodyBold.copyWith(color: colors.cyan),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (counterPlay != null && counterPlay!.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              'COUNTER: $counterPlay',
-              style: AppTextStyles.caption.copyWith(
-                color: colors.textSecondary,
-              ),
-            ),
-          ],
         ],
       ),
     );

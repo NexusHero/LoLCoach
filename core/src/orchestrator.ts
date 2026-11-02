@@ -71,7 +71,7 @@ export class BridgeOrchestrator {
     const primaryThreat = computePrimaryThreat(state);
     const teamDamageProfile = computeTeamDamageProfile(state);
     const recommendedItems = this.engine.getLastRecommendedItems?.() ?? [];
-    const nextBestBuy = computeNextBestBuy(state, recommendedItems);
+    const nextBestBuy = computeNextBestBuy(state, recommendedItems, this.preferPassiveItems);
     const enemyCooldowns = await computeEnemyCooldowns(state);
 
     return {
@@ -128,6 +128,7 @@ export class BridgeOrchestrator {
         const updatedNextBuy = computeNextBestBuy(
           state,
           this.engine.getLastRecommendedItems?.() ?? [],
+          this.preferPassiveItems,
         );
         if (updatedNextBuy) {
           insights = { ...insights, nextBestBuy: updatedNextBuy };
@@ -165,7 +166,7 @@ export class BridgeOrchestrator {
         this.wsServer.broadcast({ event: "LLM_ERROR", timestamp: this.clock(), error: msg });
       },
       onLlmSuccess: (rec, tokenUsage) => {
-        const nextBestBuy = computeNextBestBuy(state, rec.items);
+        const nextBestBuy = computeNextBestBuy(state, rec.items, this.preferPassiveItems);
         const enrichedInsights = insights
           ? { ...insights, ...(nextBestBuy ? { nextBestBuy } : {}) }
           : undefined;

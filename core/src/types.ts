@@ -192,6 +192,11 @@ export interface NextBestBuy {
   breakpointHint?: string;
 }
 
+export interface EnemySummonerCooldown {
+  name: string;
+  cooldown: number;
+}
+
 export interface EnemyCooldowns {
   championName: string;
   level: number;
@@ -200,6 +205,8 @@ export interface EnemyCooldowns {
   w: number;
   e: number;
   r: number;
+  keyThreatSpell?: "Q" | "W" | "E" | "R";
+  summonerSpells?: EnemySummonerCooldown[];
   keyThreatSummary: string;
 }
 

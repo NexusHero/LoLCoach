@@ -27,6 +27,22 @@ class NextBestBuy {
   final String? breakpointHint;
 }
 
+class EnemySummonerCooldown {
+  const EnemySummonerCooldown({
+    required this.name,
+    required this.cooldown,
+  });
+
+  factory EnemySummonerCooldown.fromJson(Map<String, dynamic> json) =>
+      EnemySummonerCooldown(
+        name: json['name'] as String? ?? '',
+        cooldown: (json['cooldown'] as num?)?.toInt() ?? 0,
+      );
+
+  final String name;
+  final int cooldown;
+}
+
 class EnemyCooldowns {
   const EnemyCooldowns({
     required this.championName,
@@ -37,6 +53,8 @@ class EnemyCooldowns {
     required this.e,
     required this.r,
     required this.keyThreatSummary,
+    this.keyThreatSpell,
+    this.summonerSpells = const [],
   });
 
   factory EnemyCooldowns.fromJson(Map<String, dynamic> json) => EnemyCooldowns(
@@ -47,6 +65,12 @@ class EnemyCooldowns {
         w: (json['w'] as num?)?.toInt() ?? 0,
         e: (json['e'] as num?)?.toInt() ?? 0,
         r: (json['r'] as num?)?.toInt() ?? 0,
+        keyThreatSpell: json['keyThreatSpell'] as String?,
+        summonerSpells: (json['summonerSpells'] as List<dynamic>? ?? const [])
+            .map(
+              (e) => EnemySummonerCooldown.fromJson(e as Map<String, dynamic>),
+            )
+            .toList(),
         keyThreatSummary: json['keyThreatSummary'] as String? ?? '',
       );
 
@@ -57,6 +81,8 @@ class EnemyCooldowns {
   final int w;
   final int e;
   final int r;
+  final String? keyThreatSpell;
+  final List<EnemySummonerCooldown> summonerSpells;
   final String keyThreatSummary;
 }
 

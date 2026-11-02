@@ -23,6 +23,18 @@ const STAT_LABELS: Record<string, string> = {
   FlatHPRegenMod: "HP5",
 };
 
+export interface ItemNumericStats {
+  ad: number;
+  ap: number;
+  armor: number;
+  mr: number;
+  hp: number;
+  attackSpeed: number;
+  crit: number;
+  abilityHaste: number;
+  percentPen: number;
+}
+
 export interface ItemInfo {
   name: string;
   stats: string;
@@ -32,6 +44,7 @@ export interface ItemInfo {
   from?: number[];
   into?: number[];
   tags?: string[];
+  numericStats?: ItemNumericStats;
 }
 
 export interface ChampionAbilities {
@@ -56,6 +69,7 @@ interface CacheFile {
 interface DDragonItem {
   name: string;
   plaintext?: string;
+  description?: string;
   stats?: Record<string, number>;
   inStore?: boolean;
   maps?: Record<string, boolean>;
@@ -183,7 +197,9 @@ export class DDragonService {
 
     for (const [id, item] of Object.entries(data.data)) {
       if (!item.name || item.inStore === false) continue;
-      const stats = this.formatStats(item.stats ?? {});
+      const rawStats = item.stats ?? {};
+      const stats = this.formatStats(rawStats);
+      const numericStats = this.extractNumericStats(rawStats, item.description ?? "");
       const fromIds = item.from?.map(Number).filter((n) => !Number.isNaN(n) && n > 0);
       const intoIds = item.into?.map(Number).filter((n) => !Number.isNaN(n) && n > 0);
       this.items[Number(id)] = {
@@ -195,8 +211,25 @@ export class DDragonService {
         ...(fromIds?.length ? { from: fromIds } : {}),
         ...(intoIds?.length ? { into: intoIds } : {}),
         ...(item.tags?.length ? { tags: item.tags } : {}),
+        numericStats,
       };
     }
+  }
+
+  private extractNumericStats(rawStats: Record<string, number>, description: string): ItemNumericStats {
+    const ahMatch = description.match(/(\d+)\s*(?:<\/attention>\s*)?Ability Haste/i);
+    const penMatch = description.match(/(\d+)%\s*(?:<\/attention>\s*)?(?:Armor|Magic) Penetration/i);
+    return {
+      ad: Math.round(rawStats.FlatPhysicalDamageMod ?? 0),
+      ap: Math.round(rawStats.FlatMagicDamageMod ?? 0),
+      armor: Math.round(rawStats.FlatArmorMod ?? 0),
+      mr: Math.round(rawStats.FlatSpellBlockMod ?? 0),
+      hp: Math.round(rawStats.FlatHPPoolMod ?? 0),
+      attackSpeed: Math.round((rawStats.PercentAttackSpeedMod ?? 0) * 100),
+      crit: Math.round((rawStats.FlatCritChanceMod ?? 0) * 100),
+      abilityHaste: ahMatch ? Number(ahMatch[1]) : 0,
+      percentPen: penMatch ? Number(penMatch[1]) : 0,
+    };
   }
 
   private async fetchChampionKeys(): Promise<void> {
