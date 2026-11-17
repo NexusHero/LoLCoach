@@ -19,7 +19,7 @@
 import http from "http";
 import { Logger } from "./logger.js";
 
-const PORT = parseInt(process.env.MOCK_LOL_PORT ?? "2999");
+const PORT = Number.parseInt(process.env.MOCK_LOL_PORT ?? "2999", 10);
 const PATH = "/liveclientdata/allgamedata";
 
 // ── ANSI colours ────────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ function player(
     isDead: false,
     items: [],
     level: 5,
-    position: team === "ORDER" ? "MID" : "MID",
+    position: "MID",
     rawChampionName: `game_character_${championName.toLowerCase()}`,
     scores: { assists: 0, creepScore: 45, deaths: 0, kills: 1, wardScore: 5 },
     skinID: 0,

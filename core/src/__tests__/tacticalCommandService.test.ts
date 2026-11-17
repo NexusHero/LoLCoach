@@ -45,7 +45,7 @@ describe("VectorMemoryService & TacticalCommandService", () => {
     });
   });
 
-  describe("TacticalCommandService (2-Tier Hybrid Command Engine)", () => {
+  describe("TacticalCommandService", () => {
     function makeTestMatchState() {
       return makeGameState({
         gameTime: 420,
@@ -78,19 +78,66 @@ describe("VectorMemoryService & TacticalCommandService", () => {
       });
     }
 
-    it("executeCommand_EnemyFlashCallout_StartsHasteAdjustedSummonerTimerInUnder2ms", async () => {
+    it("executeCommand_EnemySpellCallout_StartsNoCooldownTimerAndBecomesReviewMarker", async () => {
       const memory = new VectorMemoryService(false);
       const svc = new TacticalCommandService(memory);
       const state = makeTestMatchState();
 
-      const res = await svc.executeCommand("Zed Flash", state);
+      const res = await svc.executeCommand("Zed Flash used", state);
 
       expect(res.shouldReevaluate).toBe(false);
-      expect(res.exchange.actionsExecuted[0]).toContain("Zed FLASH (273s)");
-      const overrides = svc.getOverrides(420);
-      expect(overrides.activeTimers).toHaveLength(1);
-      expect(overrides.activeTimers[0].championName).toBe("Zed");
-      expect(overrides.activeTimers[0].remainingSeconds).toBe(273);
+      expect(res.exchange.actionsExecuted).toEqual(["📍 Marker 7:00"]);
+      expect(svc.getOverrides()).not.toHaveProperty("activeTimers");
+      expect(svc.getReviewMarkers()).toEqual([{ id: "m_1", gameTime: 420, note: "Zed Flash used" }]);
+    });
+
+    it("executeCommand_ExplicitMarkerCommand_StoresMarkerWithGameTimeAndStrippedNote", async () => {
+      const memory = new VectorMemoryService(false);
+      const svc = new TacticalCommandService(memory);
+      const state = makeTestMatchState();
+
+      const res = await svc.executeCommand("Marker: schlechter Trade", state);
+
+      expect(res.shouldReevaluate).toBe(false);
+      expect(svc.getReviewMarkers()).toEqual([
+        { id: "m_1", gameTime: 420, note: "schlechter Trade" },
+      ]);
+      expect(res.exchange.replyText).toContain("7:00");
+    });
+
+    it("executeCommand_MarkerWithoutRunningGame_SetsNoMarker", async () => {
+      const memory = new VectorMemoryService(false);
+      const svc = new TacticalCommandService(memory);
+
+      const res = await svc.executeCommand("Marker", null);
+
+      expect(svc.getReviewMarkers()).toHaveLength(0);
+      expect(res.exchange.actionsExecuted).toHaveLength(0);
+    });
+
+    it("clearOverride_MarkerKey_RemovesOnlyThatMarker", async () => {
+      const memory = new VectorMemoryService(false);
+      const svc = new TacticalCommandService(memory);
+      const state = makeTestMatchState();
+      await svc.executeCommand("Marker eins", state);
+      await svc.executeCommand("Marker zwei", state);
+
+      expect(svc.clearOverride("marker:m_1")).toBe(true);
+
+      expect(svc.getReviewMarkers().map((m) => m.id)).toEqual(["m_2"]);
+    });
+
+    it("resetMatch_AfterMarkers_ClearsMarkersAndOverrides", async () => {
+      const memory = new VectorMemoryService(false);
+      const svc = new TacticalCommandService(memory);
+      const state = makeTestMatchState();
+      await svc.executeCommand("Marker eins", state);
+      await svc.executeCommand("Swap Vayne", state);
+
+      svc.resetMatch();
+
+      expect(svc.getReviewMarkers()).toHaveLength(0);
+      expect(svc.getOverrides().laneOpponentOverride).toBeUndefined();
     });
 
     it("executeCommand_LaneSwapCommand_SetsLaneOpponentOverrideAndTriggersReeval", async () => {

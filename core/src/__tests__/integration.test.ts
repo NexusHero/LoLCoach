@@ -26,7 +26,6 @@ describe("Integration: Match Progressions", () => {
         strategy: {
           winCondition: "mid",
           summary: "Scale into mid game.",
-          immediateAction: "Farm safely.",
           lateGamePlan: "Fight with full build.",
         },
       }),

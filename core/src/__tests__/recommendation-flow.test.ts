@@ -46,7 +46,6 @@ const MOCK_ANALYSIS: LlmAnalysis = {
   strategy: {
     winCondition: "early",
     summary: "Snowball early",
-    immediateAction: "Contest level 2",
     lateGamePlan: "Close out before 30 min",
   },
   tokenUsage: { input: 60, output: 20 },

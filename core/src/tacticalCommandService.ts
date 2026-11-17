@@ -3,16 +3,46 @@ import type {
   Player,
   LiveTacticalOverrides,
   CoachExchange,
+  ReviewMarker,
   RiskLevel,
   BuildFocus,
   RolePosition,
 } from "./types.js";
-import { computeEnemyCooldowns, findLaneOpponent } from "./tacticalAnalyzer.js";
-import { computeSummonerSpellCooldown } from "./tacticalCatalog.js";
+import { findLaneOpponent } from "./tacticalAnalyzer.js";
 import { VectorMemoryService } from "./vectorMemoryService.js";
+
+const MAX_REVIEW_MARKERS = 30;
+const MIN_FREE_TEXT_MARKER_LENGTH = 8;
+
+const REMEMBER_PATTERN = /\b(?:merk\s+dir|remember|notiere)[:\s]\s*(\S.*)$/i;
+const MARKER_PATTERN = /\b(?:marker|markier\w*|mark|bookmark|clip)\b[:\s]*/i;
+const QUESTION_PATTERN = /^(wie|warum|was|wann|soll|kann|who|what|why|how|should|can)\b/;
+const LANE_SWAP_PATTERN = /\b(swap|lane\s+gegen|spiele\s+gegen|vs\b|opponent|gegner\s+ist)\b/i;
+const CAMPED_PATTERN = /\b(camp|gecampt|camping|weakside|weak\s+side|2v1|3v1|dauernd\s+gegankt)\b/i;
+const ENEMY_BUILD_PATTERN = /\b(ap|ad|tank)\b/i;
+const PRO_HUD_PATTERN = /\b(pro\s*mode|pro\s*hud|challenger\s*hud)\b/i;
+const PRO_HUD_OFF_PATTERN = /\b(aus|off|standard|normal)\b/i;
+const PASSIVE_ITEMS_PATTERN = /\b(passive\s+items|nur\s+passive|keine\s+aktiven)\b/i;
+
+const RISK_COMMANDS: ReadonlyArray<[RegExp, RiskLevel, string]> = [
+  [/\b(play\s+safe|safe\s+mode|spiel\s+safe|defensiv)\b/i, "safe", "🛡️ Risk → Safe"],
+  [/\b(aggressive|aggressiv|risky|all\s*in)\b/i, "risky", "⚔️ Risk → Risky"],
+];
+
+const BUILD_FOCUS_COMMANDS: ReadonlyArray<[RegExp, BuildFocus, string]> = [
+  [/\b(tank\s*shred|dps\s*build)\b/i, "dps", "🎯 Focus → DPS"],
+  [/\b(burst\s*build|one\s*shot)\b/i, "burst", "🎯 Focus → Burst"],
+  [/\b(bruiser|anti\s*burst)\b/i, "bruiser", "🎯 Focus → Bruiser"],
+  [/\b(split\s*push|sidelane|1v1)\b/i, "split", "🎯 Focus → Split"],
+];
 
 function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function formatGameTime(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
 export interface CommandExecutionResult {
@@ -20,19 +50,36 @@ export interface CommandExecutionResult {
   shouldReevaluate: boolean;
 }
 
+/** Mutable result that the individual command handlers contribute to. */
+interface CommandContext {
+  text: string;
+  lower: string;
+  state: ParsedGameState | null;
+  namedEnemy: Player | undefined;
+  currentOpp: Player | undefined;
+  isQuestion: boolean;
+  actions: string[];
+  replyParts: string[];
+  uiMutation: NonNullable<CoachExchange["uiMutation"]>;
+  shouldReevaluate: boolean;
+}
+
+/**
+ * Interprets typed or spoken coach commands. It records the player's own
+ * corrections (lane opponent, enemy build path, item preferences), saves
+ * matchup notes, and sets review markers for the post-game review. It never
+ * tracks enemy cooldowns — Riot's third-party policy forbids that.
+ */
 export class TacticalCommandService {
-  private overrides: LiveTacticalOverrides = {
-    enemyBuildOverrides: {},
-    tacticalNotes: [],
-    activeTimers: [],
-  };
+  private overrides: LiveTacticalOverrides = { enemyBuildOverrides: {} };
+  private reviewMarkers: ReviewMarker[] = [];
+  private markerCounter = 0;
   private exchangeCounter = 0;
   private lastExchange: CoachExchange | undefined;
 
   constructor(private readonly vectorMemory: VectorMemoryService) {}
 
-  getOverrides(currentGameTime = 0): LiveTacticalOverrides {
-    this.pruneExpiredTimers(currentGameTime);
+  getOverrides(): LiveTacticalOverrides {
     return {
       ...(this.overrides.laneOpponentOverride
         ? { laneOpponentOverride: this.overrides.laneOpponentOverride }
@@ -41,15 +88,11 @@ export class TacticalCommandService {
         ? { campedStatus: this.overrides.campedStatus }
         : {}),
       enemyBuildOverrides: { ...this.overrides.enemyBuildOverrides },
-      tacticalNotes: [...this.overrides.tacticalNotes],
-      activeTimers: this.overrides.activeTimers.map((t) => ({
-        ...t,
-        remainingSeconds:
-          currentGameTime > 0
-            ? Math.max(0, Math.round(t.expiresAtGameTime - currentGameTime))
-            : t.remainingSeconds,
-      })),
     };
+  }
+
+  getReviewMarkers(): ReviewMarker[] {
+    return this.reviewMarkers.map((m) => ({ ...m }));
   }
 
   getLastExchange(): CoachExchange | undefined {
@@ -57,11 +100,9 @@ export class TacticalCommandService {
   }
 
   resetMatch(): void {
-    this.overrides = {
-      enemyBuildOverrides: {},
-      tacticalNotes: [],
-      activeTimers: [],
-    };
+    this.overrides = { enemyBuildOverrides: {} };
+    this.reviewMarkers = [];
+    this.markerCounter = 0;
     this.lastExchange = undefined;
   }
 
@@ -75,18 +116,12 @@ export class TacticalCommandService {
       return true;
     }
     if (key.startsWith("enemyBuild:")) {
-      const champ = key.slice("enemyBuild:".length);
-      delete this.overrides.enemyBuildOverrides[champ];
+      delete this.overrides.enemyBuildOverrides[key.slice("enemyBuild:".length)];
       return true;
     }
-    if (key.startsWith("note:")) {
-      const noteText = key.slice("note:".length);
-      this.overrides.tacticalNotes = this.overrides.tacticalNotes.filter((n) => n !== noteText);
-      return true;
-    }
-    if (key.startsWith("timer:")) {
-      const timerKey = key.slice("timer:".length);
-      this.overrides.activeTimers = this.overrides.activeTimers.filter((t) => t.key !== timerKey);
+    if (key.startsWith("marker:")) {
+      const markerId = key.slice("marker:".length);
+      this.reviewMarkers = this.reviewMarkers.filter((m) => m.id !== markerId);
       return true;
     }
     if (key === "all") {
@@ -96,32 +131,140 @@ export class TacticalCommandService {
     return false;
   }
 
-  private pruneExpiredTimers(currentGameTime: number): void {
-    if (currentGameTime <= 0) return;
-    this.overrides.activeTimers = this.overrides.activeTimers.filter(
-      (t) => t.expiresAtGameTime > currentGameTime,
-    );
-  }
-
   private findMatchingEnemy(text: string, state: ParsedGameState | null): Player | undefined {
     if (!state) return undefined;
     const normText = normalize(text);
-    for (const enemy of state.enemies) {
+    return state.enemies.find((enemy) => {
       const normChamp = normalize(enemy.championName);
-      if (normChamp.length >= 3 && normText.includes(normChamp)) {
-        return enemy;
-      }
-    }
-    return undefined;
+      return normChamp.length >= 3 && normText.includes(normChamp);
+    });
   }
 
-  private computeEnemySummonerHaste(opp: Player): number {
-    let haste = 0;
-    if (opp.items.some((i) => i.itemID === 3158)) haste += 10;
-    const p = opp.runes?.primaryRuneTree?.displayName ?? "";
-    const s = opp.runes?.secondaryRuneTree?.displayName ?? "";
-    if (p.includes("Inspiration") || s.includes("Inspiration")) haste += 18;
-    return haste;
+  private addReviewMarker(ctx: CommandContext, note: string): void {
+    if (!ctx.state) {
+      ctx.replyParts.push("Kein laufendes Spiel — Marker nicht gesetzt.");
+      return;
+    }
+    const marker: ReviewMarker = {
+      id: `m_${++this.markerCounter}`,
+      gameTime: Math.floor(ctx.state.gameTime),
+      note,
+    };
+    this.reviewMarkers = [...this.reviewMarkers, marker].slice(-MAX_REVIEW_MARKERS);
+    const at = formatGameTime(marker.gameTime);
+    ctx.actions.push(`📍 Marker ${at}`);
+    ctx.replyParts.push(`Marker bei ${at} gesetzt — erscheint im Review nach dem Spiel.`);
+  }
+
+  private async applyRemember(ctx: CommandContext, clock: () => number): Promise<boolean> {
+    const match = REMEMBER_PATTERN.exec(ctx.text);
+    if (!match) return false;
+    const note = match[1].trim();
+    const myChamp = ctx.state?.localPlayer.championName ?? "General";
+    const noteEnemy = this.findMatchingEnemy(note, ctx.state) ?? ctx.namedEnemy ?? ctx.currentOpp;
+    const oppChamp = noteEnemy?.championName;
+    await this.vectorMemory.storeMatchupNote(myChamp, note, oppChamp, clock());
+    ctx.actions.push(`🧠 Memory: ${oppChamp ?? myChamp}`);
+    ctx.replyParts.push(
+      `Gespeichert im Vektor-Gedächtnis für ${myChamp}${oppChamp ? ` vs ${oppChamp}` : ""}.`,
+    );
+    return true;
+  }
+
+  private applyExplicitMarker(ctx: CommandContext): boolean {
+    if (ctx.isQuestion || !MARKER_PATTERN.test(ctx.lower)) return false;
+    this.addReviewMarker(ctx, ctx.text.replace(MARKER_PATTERN, "").trim());
+    return true;
+  }
+
+  private applyLaneSwap(ctx: CommandContext): void {
+    if (!ctx.namedEnemy || !LANE_SWAP_PATTERN.test(ctx.lower)) return;
+    this.overrides.laneOpponentOverride = ctx.namedEnemy.championName;
+    ctx.actions.push(`🔄 Lane → ${ctx.namedEnemy.championName}`);
+    ctx.replyParts.push(
+      `Matchup auf ${ctx.namedEnemy.championName} umgestellt — Item-Empfehlung wird neu berechnet.`,
+    );
+    ctx.shouldReevaluate = true;
+  }
+
+  private applyCampedStatus(ctx: CommandContext): void {
+    if (!CAMPED_PATTERN.test(ctx.lower)) return;
+    const mode = ctx.lower.includes("weak") ? "weaksided" : "camped";
+    this.overrides.campedStatus = mode;
+    ctx.uiMutation.riskLevel = "safe";
+    ctx.actions.push(`⛺ ${mode === "camped" ? "Camped" : "Weakside"} → Safe`);
+    ctx.replyParts.push("Vermerkt — Build-Stil auf Safe gestellt.");
+    ctx.shouldReevaluate = true;
+  }
+
+  private applyEnemyBuildOverrides(ctx: CommandContext): void {
+    for (const clause of ctx.text.split(/[,;.]+/)) {
+      const match = ENEMY_BUILD_PATTERN.exec(clause);
+      const enemy = this.findMatchingEnemy(clause, ctx.state);
+      if (!match || !enemy) continue;
+      const style = match[1].toLowerCase() as "ad" | "ap" | "tank";
+      this.overrides.enemyBuildOverrides[enemy.championName] = style;
+      ctx.actions.push(`🎯 ${enemy.championName} → ${style.toUpperCase()}`);
+      ctx.replyParts.push(
+        `${enemy.championName} als ${style.toUpperCase()}-Threat registriert — Resistenz-Empfehlung angepasst.`,
+      );
+      ctx.shouldReevaluate = true;
+    }
+  }
+
+  private applyHudAndBuildControls(ctx: CommandContext): void {
+    if (PRO_HUD_PATTERN.test(ctx.lower)) {
+      const disable = PRO_HUD_OFF_PATTERN.test(ctx.lower);
+      ctx.uiMutation.proMode = !disable;
+      ctx.actions.push(`🖥️ ${disable ? "Standard HUD" : "PRO HUD"}`);
+      ctx.replyParts.push(disable ? "Standard-HUD aktiviert." : "Challenger Pro HUD aktiviert.");
+    }
+
+    const risk = RISK_COMMANDS.find(([pattern]) => pattern.test(ctx.lower));
+    if (risk) {
+      ctx.uiMutation.riskLevel = risk[1];
+      ctx.actions.push(risk[2]);
+      ctx.shouldReevaluate = true;
+    }
+
+    if (PASSIVE_ITEMS_PATTERN.test(ctx.lower)) {
+      ctx.uiMutation.preferPassiveItems = true;
+      ctx.actions.push("🖱️ Passive Items ON");
+      ctx.shouldReevaluate = true;
+    }
+
+    const focus = BUILD_FOCUS_COMMANDS.find(([pattern]) => pattern.test(ctx.lower));
+    if (focus) {
+      ctx.uiMutation.buildFocus = focus[1];
+      ctx.actions.push(focus[2]);
+      ctx.shouldReevaluate = true;
+    }
+  }
+
+  /** Unrecognised statements become review markers; questions query the matchup memory. */
+  private async applyFallback(ctx: CommandContext): Promise<void> {
+    if (!ctx.isQuestion) {
+      if (ctx.text.length >= MIN_FREE_TEXT_MARKER_LENGTH) {
+        this.addReviewMarker(ctx, ctx.text);
+      } else {
+        ctx.replyParts.push("Nicht erkannt — bitte genauer formulieren.");
+      }
+      return;
+    }
+
+    const oppChamp = ctx.namedEnemy?.championName ?? ctx.currentOpp?.championName;
+    const memories = await this.vectorMemory.searchRelevantMemories(
+      ctx.text,
+      ctx.state?.localPlayer.championName,
+      oppChamp,
+      2,
+    );
+    if (memories.length === 0) {
+      ctx.replyParts.push("Dazu ist noch nichts im Matchup-Gedächtnis gespeichert.");
+      return;
+    }
+    ctx.actions.push("🧠 Vector-RAG Treffer");
+    ctx.replyParts.push(`Erinnerung: ${memories[0]}`);
   }
 
   async executeCommand(
@@ -131,197 +274,43 @@ export class TacticalCommandService {
   ): Promise<CommandExecutionResult> {
     const text = rawText.trim();
     const lower = text.toLowerCase();
-    const actions: string[] = [];
-    const uiMutation: NonNullable<CoachExchange["uiMutation"]> = {};
-    let shouldReevaluate = false;
-    let replyParts: string[] = [];
-
     const myPos = (state?.localPlayer.position || "UNKNOWN") as RolePosition;
-    const currentOpp = state
-      ? findLaneOpponent(state, myPos, this.overrides.laneOpponentOverride)
-      : undefined;
-    const namedEnemy = this.findMatchingEnemy(text, state);
+    const ctx: CommandContext = {
+      text,
+      lower,
+      state,
+      namedEnemy: this.findMatchingEnemy(text, state),
+      currentOpp: state
+        ? findLaneOpponent(state, myPos, this.overrides.laneOpponentOverride)
+        : undefined,
+      isQuestion: lower.includes("?") || QUESTION_PATTERN.test(lower),
+      actions: [],
+      replyParts: [],
+      uiMutation: {},
+      shouldReevaluate: false,
+    };
 
-    // 1. Check Vector Memory Save ("Merk dir ...", "Remember ...")
-    const rememberMatch = text.match(/\b(?:merk\s+dir|remember|notiere)[:\s]+(.+)$/i);
-    if (rememberMatch) {
-      const note = rememberMatch[1].trim();
-      const myChamp = state?.localPlayer.championName ?? "General";
-      const noteEnemy = this.findMatchingEnemy(note, state) ?? namedEnemy ?? currentOpp;
-      const oppChamp = noteEnemy?.championName;
-      await this.vectorMemory.storeMatchupNote(myChamp, note, oppChamp, clock());
-      actions.push(`🧠 Memory: ${oppChamp ?? myChamp}`);
-      replyParts.push(`Gespeichert im Vektor-Gedächtnis für ${myChamp}${oppChamp ? ` vs ${oppChamp}` : ""}.`);
+    const handled =
+      (await this.applyRemember(ctx, clock)) || this.applyExplicitMarker(ctx);
+    if (!handled) {
+      this.applyLaneSwap(ctx);
+      this.applyCampedStatus(ctx);
+      this.applyEnemyBuildOverrides(ctx);
+      this.applyHudAndBuildControls(ctx);
+      if (ctx.actions.length === 0) await this.applyFallback(ctx);
     }
 
-    // 2. Check Spell / Summoner Cooldown Callout ("Ahri Flash", "Zed Ult", "Zed Flash und R")
-    const spellMatches = [
-      ...lower.matchAll(
-        /\b(flash|ignite|teleport|tp|exhaust|ghost|cleanse|heal|barrier|smite|ult|ultimate|r|q|w|e)\b/g,
-      ),
-    ];
-    const isQuestion = lower.includes("?") || /^(wie|warum|was|wann|soll|kann|who|what|why|how|should|can)\b/.test(lower);
-
-    if (spellMatches.length > 0 && (!isQuestion || /\b(timer|cd|down|weg|raus|used|benutzt|setz)\b/.test(lower))) {
-      const targetEnemy = namedEnemy ?? currentOpp;
-      if (targetEnemy && state) {
-        const gameTime = state.gameTime;
-        const cds = await computeEnemyCooldowns(state, targetEnemy.championName);
-        const seenSlots = new Set<string>();
-
-        for (const match of spellMatches) {
-          const rawSpell = match[1];
-          let label = rawSpell.toUpperCase();
-          let cdSec = 0;
-          let slotKey = label;
-
-          if (["q", "w", "e", "r", "ult", "ultimate"].includes(rawSpell)) {
-            const slot = rawSpell.startsWith("u") ? "R" : rawSpell.toUpperCase();
-            slotKey = slot;
-            label = slot;
-            cdSec = slot === "Q" ? (cds?.q ?? 8) : slot === "W" ? (cds?.w ?? 14) : slot === "E" ? (cds?.e ?? 15) : (cds?.r ?? 100);
-          } else {
-            const spellName = rawSpell === "tp" ? "Teleport" : rawSpell;
-            const haste = this.computeEnemySummonerHaste(targetEnemy);
-            const parsed = computeSummonerSpellCooldown(spellName, targetEnemy.level, gameTime, haste);
-            if (parsed) {
-              label = parsed.name.toUpperCase();
-              cdSec = parsed.cooldown;
-              slotKey = `SUM_${parsed.name.toUpperCase()}`;
-            }
-          }
-
-          if (cdSec > 0 && !seenSlots.has(slotKey)) {
-            seenSlots.add(slotKey);
-            const timerKey = `${targetEnemy.championName}_${slotKey}`;
-            this.overrides.activeTimers = this.overrides.activeTimers.filter((t) => t.key !== timerKey);
-            this.overrides.activeTimers.push({
-              key: timerKey,
-              label,
-              championName: targetEnemy.championName,
-              remainingSeconds: cdSec,
-              totalSeconds: cdSec,
-              expiresAtGameTime: gameTime + cdSec,
-            });
-            actions.push(`⏱ ${targetEnemy.championName} ${label} (${cdSec}s)`);
-            replyParts.push(`${targetEnemy.championName} ${label} Timer läuft (${cdSec}s) — Fenster ausnutzen!`);
-          }
-        }
-      }
-    }
-
-    // 3. Check Lane Swap Override ("Swap Vayne", "Lane gegen Vayne", "Vayne ist Top/Mid")
-    if (/\b(swap|lane\s+gegen|spiele\s+gegen|vs\b|opponent|gegner\s+ist)\b/i.test(lower) && namedEnemy) {
-      this.overrides.laneOpponentOverride = namedEnemy.championName;
-      actions.push(`🔄 Lane → ${namedEnemy.championName}`);
-      replyParts.push(`Matchup auf ${namedEnemy.championName} umgestellt — Cooldowns & Konter werden neu berechnet.`);
-      shouldReevaluate = true;
-    }
-
-    // 4. Check Camped / Weakside Override
-    if (/\b(camp|gecampt|camping|weakside|weak\s+side|2v1|3v1|dauernd\s+gegankt)\b/i.test(lower)) {
-      const mode = lower.includes("weak") ? "weaksided" : "camped";
-      this.overrides.campedStatus = mode;
-      uiMutation.riskLevel = "safe";
-      actions.push(`⛺ ${mode === "camped" ? "Camped" : "Weakside"} → Safe`);
-      replyParts.push("Anti-Camp-Protokoll aktiv: Risiko auf Safe, Wave vor eigenem Turm halten.");
-      shouldReevaluate = true;
-    }
-
-    // 5. Check Enemy Build Override ("Kai'Sa geht AP", "Varus AP", "Diana Tank")
-    for (const clause of text.split(/[,;.]+/)) {
-      const m = clause.match(/\b(geht\s+auf|geht|baut|ist\s+voll|buildet|playing|going)?\s*\b(ap|ad|tank)\b/i);
-      const clauseEnemy = this.findMatchingEnemy(clause, state);
-      if (m && clauseEnemy) {
-        const style = m[2].toLowerCase() as "ad" | "ap" | "tank";
-        this.overrides.enemyBuildOverrides[clauseEnemy.championName] = style;
-        actions.push(`🎯 ${clauseEnemy.championName} → ${style.toUpperCase()}`);
-        replyParts.push(`${clauseEnemy.championName} als ${style.toUpperCase()}-Threat registriert — Resistenz-Empfehlung angepasst.`);
-        shouldReevaluate = true;
-      }
-    }
-
-    // 6. Check App / HUD Mode Controls
-    if (/\b(pro\s*mode|pro\s*hud|challenger\s*hud)\b/i.test(lower)) {
-      const disable = /\b(aus|off|standard|normal)\b/i.test(lower);
-      uiMutation.proMode = !disable;
-      actions.push(`🖥️ ${disable ? "Standard HUD" : "PRO HUD"}`);
-      replyParts.push(disable ? "Standard-HUD aktiviert." : "Challenger Pro HUD aktiviert.");
-    }
-    if (/\b(play\s+safe|safe\s+mode|spiel\s+safe|defensiv)\b/i.test(lower)) {
-      uiMutation.riskLevel = "safe" as RiskLevel;
-      actions.push("🛡️ Risk → Safe");
-      shouldReevaluate = true;
-    } else if (/\b(aggressive|aggressiv|risky|all\s*in)\b/i.test(lower)) {
-      uiMutation.riskLevel = "risky" as RiskLevel;
-      actions.push("⚔️ Risk → Risky");
-      shouldReevaluate = true;
-    }
-    if (/\b(passive\s+items|nur\s+passive|keine\s+aktiven)\b/i.test(lower)) {
-      uiMutation.preferPassiveItems = true;
-      actions.push("🖱️ Passive Items ON");
-      shouldReevaluate = true;
-    }
-    if (/\b(tank\s*shred|dps\s*build)\b/i.test(lower)) {
-      uiMutation.buildFocus = "dps" as BuildFocus;
-      actions.push("🎯 Focus → DPS");
-      shouldReevaluate = true;
-    } else if (/\b(burst\s*build|one\s*shot)\b/i.test(lower)) {
-      uiMutation.buildFocus = "burst" as BuildFocus;
-      actions.push("🎯 Focus → Burst");
-      shouldReevaluate = true;
-    } else if (/\b(bruiser|anti\s*burst)\b/i.test(lower)) {
-      uiMutation.buildFocus = "bruiser" as BuildFocus;
-      actions.push("🎯 Focus → Bruiser");
-      shouldReevaluate = true;
-    } else if (/\b(split\s*push|sidelane|1v1)\b/i.test(lower)) {
-      uiMutation.buildFocus = "split" as BuildFocus;
-      actions.push("🎯 Focus → Split");
-      shouldReevaluate = true;
-    }
-
-    // 7. If the user shared non-trivial tactical info or asked a question, store note & query Vector RAG
-    if (actions.length === 0 || isQuestion) {
-      if (!isQuestion && text.length >= 8 && !rememberMatch) {
-        this.overrides.tacticalNotes = [...this.overrides.tacticalNotes.slice(-3), text];
-        actions.push("📌 Live-Fakt aktiv");
-        shouldReevaluate = true;
-      }
-
-      const myChamp = state?.localPlayer.championName;
-      const oppChamp = namedEnemy?.championName ?? currentOpp?.championName;
-      const memories = await this.vectorMemory.searchRelevantMemories(text, myChamp, oppChamp, 2);
-
-      if (memories.length > 0 && isQuestion) {
-        actions.push("🧠 Vector-RAG Treffer");
-      }
-
-      if (replyParts.length === 0) {
-        if (memories.length > 0) {
-          replyParts.push(`Erinnerung: ${memories[0]}`);
-        } else if (state && currentOpp) {
-          const gold = Math.floor(state.activePlayer.currentGold);
-          replyParts.push(
-            `Verstanden (${state.localPlayer.championName} vs ${currentOpp.championName}, ${gold}g). Empfehlung wird mit deinem Callout aktualisiert.`,
-          );
-          shouldReevaluate = true;
-        } else {
-          replyParts.push("Verstanden — taktischer Kontext ist gespeichert.");
-        }
-      }
-    }
-
-    const hasUiMutation = Object.keys(uiMutation).length > 0;
+    const hasUiMutation = Object.keys(ctx.uiMutation).length > 0;
     const exchange: CoachExchange = {
       id: `cmd_${++this.exchangeCounter}`,
       userText: text,
-      replyText: replyParts.join(" "),
-      actionsExecuted: actions,
-      ...(hasUiMutation ? { uiMutation } : {}),
+      replyText: ctx.replyParts.join(" "),
+      actionsExecuted: ctx.actions,
+      ...(hasUiMutation ? { uiMutation: ctx.uiMutation } : {}),
       timestamp: clock(),
     };
 
     this.lastExchange = exchange;
-    return { exchange, shouldReevaluate };
+    return { exchange, shouldReevaluate: ctx.shouldReevaluate };
   }
 }

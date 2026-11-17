@@ -100,7 +100,7 @@ describe("AsyncAPI Contract: broadcast messages match schema", () => {
       getAnalysis: jest.fn().mockResolvedValue({
         reasoning: "mock reasoning",
         situationalItems: [{ id: 3102, name: "Banshee's Veil", reason: "AP heavy", priority: "situational" }],
-        strategy: { winCondition: "early" as const, summary: "s", immediateAction: "a", lateGamePlan: "b" },
+        strategy: { winCondition: "early" as const, summary: "s", lateGamePlan: "b" },
       }),
     };
   }
@@ -165,12 +165,12 @@ describe("AsyncAPI Contract: broadcast messages match schema", () => {
 
     await orchestrator.handleGameData(makeRawGameData());
 
-    for (const msg of broadcasts) {
-      const result = BaseMessageSchema.safeParse(msg);
-      if (!result.success) {
-        throw new Error(`Message "${msg.event}" failed schema: ${result.error.message}`);
-      }
-    }
+    expect(broadcasts.length).toBeGreaterThan(0);
+    const failures = broadcasts
+      .map((msg) => ({ event: msg.event, result: BaseMessageSchema.safeParse(msg) }))
+      .filter(({ result }) => !result.success)
+      .map(({ event }) => event);
+    expect(failures).toEqual([]);
   });
 
   it("broadcast_RecommendationSource_IsAlwaysLlm", async () => {

@@ -83,7 +83,7 @@ export class GeminiProvider implements LlmProvider {
       });
 
       const text = result.text;
-      if (!text) return { reasoning: "", strategy: { winCondition: "mid", summary: "", immediateAction: "", lateGamePlan: "" } };
+      if (!text) return { reasoning: "", strategy: { winCondition: "mid", summary: "", lateGamePlan: "" } };
 
       const meta = result.usageMetadata;
       const tokenUsage: TokenUsage = {
@@ -100,10 +100,11 @@ export class GeminiProvider implements LlmProvider {
 
   private formatError(err: unknown): string {
     const msg = err instanceof Error ? err.message : String(err);
-    const jsonMatch = msg.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
+    const jsonStart = msg.indexOf("{");
+    const jsonEnd = msg.lastIndexOf("}");
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
       try {
-        const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+        const parsed = JSON.parse(msg.slice(jsonStart, jsonEnd + 1)) as Record<string, unknown>;
         const geminiMsg = (parsed?.error as Record<string, unknown> | undefined)?.message;
         if (typeof geminiMsg === "string" && geminiMsg.length > 0) {
           return geminiMsg.slice(0, 120);

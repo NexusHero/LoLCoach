@@ -19,7 +19,8 @@ export interface LlmContextOptions {
   vectorMemories?: string[];
 }
 
-export const SYSTEM_PROMPT = `You are an experienced League of Legends coach giving live in-game advice.
+export const SYSTEM_PROMPT = `You are an experienced League of Legends itemization coach.
+You advise on WHAT TO BUY and on the overall game plan. You never tell the player what to do in the moment: no "do X now" calls, no gank, roam, trade or all-in instructions, no cooldown or power-spike alerts.
 The player will glance at your output for a few seconds during a match, so every field must be SHORT and SCANNABLE.
 Analyze the game state and respond ONLY with a JSON object — no markdown, no code blocks, no extra text.
 Use this exact format:
@@ -31,10 +32,8 @@ Use this exact format:
   "strategy": {
     "winCondition": "early" or "mid" or "late",
     "summary": "Max ~10 words: when and how the player wins this game",
-    "immediateAction": "Max ~12 words: what to do RIGHT NOW, referencing their champion/stats",
     "lateGamePlan": "Max ~12 words: how to close out the game with the final build",
-    "laneMatchupAnalysis": "Max ~15 words: the single most important matchup fact for this role",
-    "counterPlay": "Max ~12 words: one concrete role-appropriate action to swing the matchup"
+    "laneMatchupAnalysis": "Max ~15 words: the single most important matchup fact for this role"
   }
 }
 
@@ -54,18 +53,16 @@ Never repeat items already in the counter items list. Use [] only if the counter
 
 The "Counter items" shown are automated heuristic suggestions. You may override itemReasoning if they don't fit the champion.
 
-Adjust analysis based on the player's role:
-- UTILITY (Support): ignore CS. Focus on vision, assists, ADC protection, engage/disengage/peel.
-- BOTTOM (ADC): CS lead/deficit matters most. Sustained DPS and positioning in fights.
-- TOP: split-push vs teamfight timing for this champion, teleport plays, wave management.
-- JUNGLE: Drake/Baron/Herald control, which lanes need ganks, when to invade.
-- MIDDLE: roam timing, wave management before roaming, mid-tier objective priority.
+Adjust the game plan fields to the player's role:
+- UTILITY (Support): ignore CS. Vision, peel and engage tools matter more than damage.
+- BOTTOM (ADC): sustained DPS and survivability against the main dive threat.
+- TOP: whether this champion wins through side lanes or teamfights.
+- JUNGLE: which objectives this champion's build is strong at contesting.
+- MIDDLE: burst versus scaling, and waveclear needs.
 
 Summoner spells: each enemy lists their summoner spells (e.g. [Flash, Ignite]).
-Use them to judge kill threat and trade risk: Ignite = early all-in/kill pressure, Exhaust = anti-dive/anti-burst, Heal = sustain in 2v2, Teleport = map pressure, Cleanse = CC resistant.
-HONESTY RULE: you do NOT know enemy cooldowns — never state that an enemy spell "is down" or "is on cooldown" as fact. If a play depends on it, phrase it conditionally: "if their Flash is down, …". The only certainty is a DEAD enemy (their cooldowns reset on respawn).
-
-"immediateAction" is the single most important line the player reads — make it the concrete play for RIGHT NOW.
+Use them only to judge which defensive or offensive stats matter: Ignite = burst and healing reduction against you, Exhaust = your burst is blunted, Heal = enemy sustain, Cleanse = your CC is less reliable.
+Never mention enemy cooldowns or whether an enemy spell is available.
 
 Be specific. Reference actual numbers (CS lead, kill lead, vision score, gold gap). Do not give generic advice.`;
 
@@ -76,12 +73,12 @@ Be specific. Reference actual numbers (CS lead, kill lead, vision score, gold ga
 export function riskDirective(risk: RiskLevel): string {
   switch (risk) {
     case "safe":
-      return `Playstyle: SAFE. Bias toward survival and tempo over kills. Prefer disengage, safe farming, and objective trades. Only suggest an all-in when it is near risk-free. Lead "immediateAction" with the cautious play.`;
+      return `Build style: SAFE. Bias item choices toward survivability — resistances, health and defensive actives before greedy damage.`;
     case "risky":
-      return `Playstyle: AGGRESSIVE. Reward proactive, high-upside plays. When an all-in, dive, or pick is realistic, call it explicitly in "immediateAction" (e.g. "Flash in, Ignite, Q — if their Flash is down they die"). Stay within the HONESTY RULE: conditional, never claiming enemy cooldowns as fact.`;
+      return `Build style: AGGRESSIVE. Bias item choices toward damage and snowballing; add defense only against a clear, fed threat.`;
     case "normal":
     default:
-      return `Playstyle: BALANCED. Weigh risk and reward normally for this game state.`;
+      return `Build style: BALANCED. Weigh damage and survivability normally for this game state.`;
   }
 }
 
@@ -245,14 +242,11 @@ export async function buildUserPrompt(
     overrideParts.push(`Lane Swap Override: Player is laning directly vs ${overrides.laneOpponentOverride}`);
   }
   if (overrides?.campedStatus === "camped" || overrides?.campedStatus === "weaksided") {
-    overrideParts.push(`Jungle Pressure: Player is being ${overrides.campedStatus.toUpperCase()} — prioritize anti-dive survival & wave freeze`);
+    overrideParts.push(`Jungle Pressure: Player reports being ${overrides.campedStatus.toUpperCase()} — favor defensive item choices`);
   }
   if (overrides?.enemyBuildOverrides && Object.keys(overrides.enemyBuildOverrides).length > 0) {
     const entries = Object.entries(overrides.enemyBuildOverrides).map(([c, b]) => `${c}=${b.toUpperCase()}`);
     overrideParts.push(`Enemy Build Overrides: ${entries.join(", ")}`);
-  }
-  if (overrides?.tacticalNotes && overrides.tacticalNotes.length > 0) {
-    overrideParts.push(`Player Live Callouts: ${overrides.tacticalNotes.join(" | ")}`);
   }
   const overridesLine = overrideParts.join(" | ");
 
@@ -261,22 +255,7 @@ export async function buildUserPrompt(
       ? `Past Matchup Memory (Vector RAG): ${options.vectorMemories.join(" || ")}`
       : "";
 
-  let levelSpikeLine = "";
-  if (primaryOpponent && myPos !== "JUNGLE") {
-    const myLvl = state.localPlayer.level;
-    const oppLvl = primaryOpponent.level;
-    if (myLvl === 5 && oppLvl >= 6) {
-      levelSpikeLine = `Level Spike Window: DANGER — ${primaryOpponent.championName} is Lvl ${oppLvl} (HAS ULTIMATE R) vs your Lvl 5 — respect all-in!`;
-    } else if (myLvl >= 6 && oppLvl === 5) {
-      levelSpikeLine = `Level Spike Window: ADVANTAGE — You are Lvl ${myLvl} (HAVE R) vs Lvl 5 ${primaryOpponent.championName} (NO R) — force trade/all-in now!`;
-    } else if (myLvl === 5 && oppLvl === 5) {
-      levelSpikeLine = `Level Spike Window: Both Lvl 5 — contest next wave to hit Level 6 Ultimate first!`;
-    } else if (state.gameTime < 210 && myLvl === 1 && oppLvl === 1) {
-      levelSpikeLine = `Level Spike Window: Lvl 1 race — thin wave to hit Level 2 (7th minion solo / 9th duo) first!`;
-    }
-  }
-
-  const extraLines = [threatLine, objLine, levelSpikeLine, roleContext, focusLine, habitsLine, overridesLine, memoryLine]
+  const extraLines = [threatLine, objLine, roleContext, focusLine, habitsLine, overridesLine, memoryLine]
     .filter((l) => l.length > 0)
     .join("\n");
 

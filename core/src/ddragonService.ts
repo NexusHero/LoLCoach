@@ -217,8 +217,8 @@ export class DDragonService {
   }
 
   private extractNumericStats(rawStats: Record<string, number>, description: string): ItemNumericStats {
-    const ahMatch = description.match(/(\d+)\s*(?:<\/attention>\s*)?Ability Haste/i);
-    const penMatch = description.match(/(\d+)%\s*(?:<\/attention>\s*)?(?:Armor|Magic) Penetration/i);
+    const ahMatch = /(\d+)(?:\s|<\/attention>)*Ability Haste/i.exec(description);
+    const penMatch = /(\d+)%(?:\s|<\/attention>)*(?:Armor|Magic) Penetration/i.exec(description);
     return {
       ad: Math.round(rawStats.FlatPhysicalDamageMod ?? 0),
       ap: Math.round(rawStats.FlatMagicDamageMod ?? 0),

@@ -6,12 +6,12 @@ import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
 
-/// Tri-Modal Tactical Comms Bar ('F1 Race Engineer'):
-/// 1. Hands-Free Voice / TTS Toggle
-/// 2. 1-Click Quick-Callout Pills for mouse-click players (Flash, Ult, Camped, Swap)
-/// 3. Active Context Override Chips (1-click removable)
-/// 4. F1-Radio Response Banner + Action Execution Pills
-/// 5. Compact Command / Question input
+/// Coach command bar:
+/// 1. Hands-free voice toggle
+/// 2. Quick pills: review marker, camped, lane swap
+/// 3. Active override and review-marker chips (1-click removable)
+/// 4. Reply banner with executed actions
+/// 5. Compact command / question input
 class TacticalCommsBar extends StatefulWidget {
   const TacticalCommsBar({
     required this.onSendCommand,
@@ -55,8 +55,6 @@ class _TacticalCommsBarState extends State<TacticalCommsBar> {
   String get _currentOpponent {
     final ov = widget.tacticalInsights?.liveOverrides?.laneOpponentOverride;
     if (ov != null && ov.isNotEmpty) return ov;
-    final cds = widget.tacticalInsights?.enemyCooldowns?.championName;
-    if (cds != null && cds.isNotEmpty) return cds;
     final enemies = widget.gameState?.enemies ?? const [];
     return enemies.isNotEmpty ? enemies.first.championName : 'Enemy';
   }
@@ -74,7 +72,7 @@ class _TacticalCommsBarState extends State<TacticalCommsBar> {
     final exchange =
         widget.lastExchange ?? widget.tacticalInsights?.lastCoachExchange;
     final overrides = widget.tacticalInsights?.liveOverrides;
-    final opp = _currentOpponent;
+    final markers = widget.tacticalInsights?.reviewMarkers ?? const [];
     final swapTarget = _nextSwapCandidate;
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
@@ -90,9 +88,10 @@ class _TacticalCommsBarState extends State<TacticalCommsBar> {
             _RadioReplyBanner(exchange: exchange),
             const SizedBox(height: 10),
           ],
-          if (overrides != null && overrides.hasAny) ...[
+          if ((overrides?.hasAny ?? false) || markers.isNotEmpty) ...[
             _ActiveOverridesStrip(
-              overrides: overrides,
+              overrides: overrides ?? const LiveTacticalOverrides(),
+              markers: markers,
               onClear: widget.onClearOverride,
             ),
             const SizedBox(height: 10),
@@ -107,18 +106,11 @@ class _TacticalCommsBarState extends State<TacticalCommsBar> {
                 onTap: () => widget.onVoiceToggled?.call(!widget.voiceEnabled),
               ),
               _QuickCalloutPill(
-                icon: Icons.flash_on_rounded,
-                label: '$opp Flash',
+                icon: Icons.bookmark_add_outlined,
+                label: 'Marker',
                 hotkey: 'F1',
                 accent: colors.gold,
-                onTap: () => widget.onSendCommand('$opp Flash'),
-              ),
-              _QuickCalloutPill(
-                icon: Icons.bolt_rounded,
-                label: '$opp Ult',
-                hotkey: 'F2',
-                accent: colors.cyan,
-                onTap: () => widget.onSendCommand('$opp R'),
+                onTap: () => widget.onSendCommand('Marker'),
               ),
               _QuickCalloutPill(
                 icon: Icons.shield_outlined,
@@ -151,7 +143,7 @@ class _TacticalCommsBarState extends State<TacticalCommsBar> {
                     ),
                     decoration: InputDecoration(
                       hintText:
-                          'Callout or ask Coach (e.g. "$opp Flash", "Kaisa AP", "Merk dir: ...")',
+                          'Marker or command (e.g. "Marker: bad trade", "Kaisa AP", "Merk dir: ...")',
                       hintStyle: AppTextStyles.caption.copyWith(
                         color: colors.textDisabled,
                       ),
@@ -223,7 +215,7 @@ class _RadioReplyBanner extends StatelessWidget {
             children: [
               Icon(Icons.headset_mic_rounded, size: 14, color: colors.magic),
               const SizedBox(width: 6),
-              Text('RACE ENGINEER RADIO', style: AppTextStyles.micro.copyWith(color: colors.magic, fontWeight: FontWeight.w800)),
+              Text('COACH', style: AppTextStyles.micro.copyWith(color: colors.magic, fontWeight: FontWeight.w800)),
               const Spacer(),
               Text('"${exchange.userText}"', style: AppTextStyles.micro.copyWith(color: colors.textDisabled)),
             ],
@@ -256,8 +248,13 @@ class _RadioReplyBanner extends StatelessWidget {
 }
 
 class _ActiveOverridesStrip extends StatelessWidget {
-  const _ActiveOverridesStrip({required this.overrides, this.onClear});
+  const _ActiveOverridesStrip({
+    required this.overrides,
+    this.markers = const [],
+    this.onClear,
+  });
   final LiveTacticalOverrides overrides;
+  final List<ReviewMarker> markers;
   final ValueChanged<String>? onClear;
 
   @override
@@ -270,9 +267,11 @@ class _ActiveOverridesStrip extends StatelessWidget {
         ('campedStatus', '⛺ ${overrides.campedStatus!.toUpperCase()}'),
       for (final e in overrides.enemyBuildOverrides.entries)
         ('enemyBuild:${e.key}', '🎯 ${e.key} = ${e.value.toUpperCase()}'),
-      for (final t in overrides.activeTimers)
-        ('timer:${t.key}', '⏱ ${t.championName} ${t.label} (${t.remainingSeconds}s)'),
-      for (final n in overrides.tacticalNotes) ('note:$n', '📌 $n'),
+      for (final m in markers)
+        (
+          'marker:${m.id}',
+          m.note.isEmpty ? '📍 ${m.clock}' : '📍 ${m.clock} ${m.note}',
+        ),
     ];
 
     return Wrap(

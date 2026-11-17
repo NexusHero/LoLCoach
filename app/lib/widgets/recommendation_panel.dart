@@ -98,11 +98,8 @@ class _RecommendationPanelState extends State<RecommendationPanel>
     return '${diff.inHours}h ago';
   }
 
-  String get _heroAction {
-    final s = widget.recommendation.strategy;
-    final action = s?.immediateAction.trim();
-    if (action != null && action.isNotEmpty) return action;
-    final summary = s?.summary.trim();
+  String get _heroSummary {
+    final summary = widget.recommendation.strategy?.summary.trim();
     if (summary != null && summary.isNotEmpty) return summary;
     return widget.recommendation.reasoning;
   }
@@ -126,7 +123,6 @@ class _RecommendationPanelState extends State<RecommendationPanel>
     final strategy = rec.strategy;
     final rest = rec.items.where((i) => i != hero).toList();
     final nextBuy = widget.tacticalInsights?.nextBestBuy;
-    final enemyCds = widget.tacticalInsights?.enemyCooldowns;
 
     final card = GameCard(
       accent: isLlm ? colors.magic : null,
@@ -136,12 +132,12 @@ class _RecommendationPanelState extends State<RecommendationPanel>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _Eyebrow(
-            label: isLlm ? 'DO THIS NOW' : 'SUGGESTED',
+            label: isLlm ? 'BUILD PLAN' : 'SUGGESTED',
             color: accent,
             trailing: widget.isAnalyzing ? _UpdatingChip(color: accent) : null,
           ),
           const SizedBox(height: 12),
-          Text(_heroAction, style: AppTextStyles.hero),
+          Text(_heroSummary, style: AppTextStyles.hero),
           if (nextBuy != null) ...[
             const SizedBox(height: 14),
             NextBestBuyBanner(buy: nextBuy),
@@ -177,17 +173,7 @@ class _RecommendationPanelState extends State<RecommendationPanel>
               ],
             ),
           ],
-          if (enemyCds != null) ...[
-            const SizedBox(height: 12),
-            EnemyCooldownsStrip(
-              cooldowns: enemyCds,
-              activeTimers:
-                  widget.tacticalInsights?.liveOverrides?.activeTimers ??
-                      const [],
-            ),
-          ],
-          if (strategy?.laneMatchupAnalysis != null ||
-              strategy?.counterPlay != null) ...[
+          if (strategy?.laneMatchupAnalysis != null) ...[
             const SizedBox(height: 12),
             StrategyLinesBlock(strategy: strategy!),
           ],

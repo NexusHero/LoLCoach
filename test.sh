@@ -68,11 +68,11 @@ MOCK_PID=""
 MOCK_PORT=29990
 
 # ── helpers ───────────────────────────────────────────────────────────────────
-section() { [ "$VERBOSITY" -ge 1 ] && echo -e "\n${CYAN}${BOLD}▶ $1${RESET}" || true; }
+section() { [[ "$VERBOSITY" -ge 1 ]] && echo -e "\n${CYAN}${BOLD}▶ $1${RESET}" || true; }
 ok()      { echo -e "${GREEN}${BOLD}✔ $1${RESET}"; }
 fail()    { echo -e "${RED}${BOLD}✖ $1${RESET}"; }
 warn()    { echo -e "${YELLOW}$1${RESET}"; }
-info()    { [ "$VERBOSITY" -ge 1 ] && echo -e "  $*" || true; }
+info()    { [[ "$VERBOSITY" -ge 1 ]] && echo -e "  $*" || true; }
 
 check_tool() {
   if ! command -v "$1" &>/dev/null; then
@@ -93,13 +93,13 @@ run_cmd() {
   local _var=$1 _filter=$2; shift 2
   local _exit=0 _tmp
 
-  if [ "$VERBOSITY" -ge 2 ]; then
+  if [[ "$VERBOSITY" -ge 2 ]]; then
     if "$@" 2>&1; then _exit=0; else _exit=$?; fi
   else
     _tmp=$(mktemp)
     if "$@" >"$_tmp" 2>&1; then _exit=0; else _exit=$?; fi
-    if [ "$VERBOSITY" -ge 1 ]; then
-      if [ -n "$_filter" ]; then
+    if [[ "$VERBOSITY" -ge 1 ]]; then
+      if [[ -n "$_filter" ]]; then
         grep -v "$_filter" "$_tmp" || true
       else
         cat "$_tmp"
@@ -115,7 +115,7 @@ run_cmd() {
 
 # Guaranteed cleanup — fires on EXIT (normal, Ctrl-C, error, SIGTERM).
 cleanup_mock() {
-  if [ -n "$MOCK_PID" ]; then
+  if [[ -n "$MOCK_PID" ]]; then
     kill "$MOCK_PID" 2>/dev/null || true
     wait "$MOCK_PID" 2>/dev/null || true
     MOCK_PID=""
@@ -133,7 +133,7 @@ start_mock_server() {
 
   info "port : $MOCK_PORT"
   info "cmd  : npx tsx src/mock-lol-server.ts"
-  [ "$VERBOSITY" -ge 1 ] && echo "" || true
+  [[ "$VERBOSITY" -ge 1 ]] && echo "" || true
 
   MOCK_LOL_PORT=$MOCK_PORT npx --prefix "$CORE_DIR" tsx \
     "$CORE_DIR/src/mock-lol-server.ts" >/tmp/mock-lol.log 2>&1 &
@@ -182,21 +182,21 @@ run_core() {
   fi
 
   # Suppress console.log from test code unless verbose
-  if ! $WATCH && [ "$VERBOSITY" -le 1 ]; then
+  if ! $WATCH && [[ "$VERBOSITY" -le 1 ]]; then
     jest_args="$jest_args --silent"
   fi
 
   info "dir  : $CORE_DIR"
   info "cmd  : npm test -- $jest_args"
-  if [ -n "${LIVE_CLIENT_URL:-}" ]; then
+  if [[ -n "${LIVE_CLIENT_URL:-}" ]]; then
     info "env  : LIVE_CLIENT_URL=$LIVE_CLIENT_URL"
   fi
-  [ "$VERBOSITY" -ge 1 ] && echo "" || true
+  [[ "$VERBOSITY" -ge 1 ]] && echo "" || true
 
   # shellcheck disable=SC2086
   run_cmd CORE_EXIT "" npm test -- $jest_args
 
-  if [ "$CORE_EXIT" -eq 0 ]; then
+  if [[ "$CORE_EXIT" -eq 0 ]]; then
     ok "Core tests passed"
   else
     fail "Core tests failed (exit $CORE_EXIT)"
@@ -222,9 +222,9 @@ run_app() {
   # ── analyze (mirrors CI) ──────────────────────────────────────────────────
   local _analyze_exit=0
   info "cmd  : flutter analyze"
-  [ "$VERBOSITY" -ge 1 ] && echo "" || true
+  [[ "$VERBOSITY" -ge 1 ]] && echo "" || true
   run_cmd _analyze_exit "" flutter analyze
-  if [ "$_analyze_exit" -eq 0 ]; then
+  if [[ "$_analyze_exit" -eq 0 ]]; then
     ok "Flutter analyze passed"
   else
     fail "Flutter analyze failed (exit $_analyze_exit)"
@@ -235,13 +235,13 @@ run_app() {
 
   # Update goldens first if requested
   if $UPDATE_GOLDENS; then
-    [ "$VERBOSITY" -ge 1 ] && echo "" || true
+    [[ "$VERBOSITY" -ge 1 ]] && echo "" || true
     warn "  Regenerating golden baselines…"
     local _golden_exit=0
     run_cmd _golden_exit "^\[" flutter test \
       --update-goldens \
       test/widgets/recommendation_panel_golden_test.dart
-    if [ "$_golden_exit" -eq 0 ]; then
+    if [[ "$_golden_exit" -eq 0 ]]; then
       ok "Goldens updated"
     else
       fail "Golden update failed"
@@ -273,12 +273,12 @@ run_app() {
   fi
 
   info "cmd  : flutter test ${test_dirs[*]}"
-  [ "$VERBOSITY" -ge 1 ] && echo "" || true
+  [[ "$VERBOSITY" -ge 1 ]] && echo "" || true
 
   # Lines starting with [ are console logs from app code (e.g. [WsService] …)
   run_cmd APP_EXIT "^\[" flutter test "${test_dirs[@]}"
 
-  if [ "$APP_EXIT" -eq 0 ]; then
+  if [[ "$APP_EXIT" -eq 0 ]]; then
     ok "App tests passed"
   else
     fail "App tests failed (exit $APP_EXIT)"
@@ -299,7 +299,7 @@ print_summary() {
   fi
 
   if $RUN_CORE; then
-    if [ $CORE_EXIT -eq 0 ]; then
+    if [[ $CORE_EXIT -eq 0 ]]; then
       ok "  Core passed"
     else
       fail "  Core FAILED"
@@ -309,7 +309,7 @@ print_summary() {
   fi
 
   if $RUN_APP; then
-    if [ $APP_EXIT -eq 0 ]; then
+    if [[ $APP_EXIT -eq 0 ]]; then
       ok "  App  passed"
     else
       fail "  App  FAILED"
@@ -321,10 +321,10 @@ print_summary() {
   echo ""
 
   local overall=0
-  $RUN_CORE  && [ $CORE_EXIT -ne 0 ] && overall=1
-  $RUN_APP && [ $APP_EXIT -ne 0 ] && overall=1
+  $RUN_CORE  && [[ $CORE_EXIT -ne 0 ]] && overall=1
+  $RUN_APP && [[ $APP_EXIT -ne 0 ]] && overall=1
 
-  if [ $overall -eq 0 ]; then
+  if [[ $overall -eq 0 ]]; then
     echo -e "${GREEN}${BOLD}  All tests passed.${RESET}"
   else
     echo -e "${RED}${BOLD}  Some tests failed.${RESET}"

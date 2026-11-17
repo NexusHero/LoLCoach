@@ -69,7 +69,7 @@ class AppTextStyles {
     fontFeatures: _tabular,
   );
 
-  /// 11 — the rare, deliberate UPPERCASE label ("DO THIS NOW", "MATCHUP").
+  /// 11 — the rare, deliberate UPPERCASE label ("BUILD PLAN", "MATCHUP").
   static const eyebrow = TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w700,

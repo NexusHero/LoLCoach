@@ -21,7 +21,7 @@ jest.mock("../llmProvider.js", () => ({
     name: "mock",
     getAnalysis: jest.fn().mockResolvedValue({
       reasoning: "mock reasoning",
-      strategy: { winCondition: "mid", summary: "s", immediateAction: "a", lateGamePlan: "b" },
+      strategy: { winCondition: "mid", summary: "s", lateGamePlan: "b" },
     }),
   }),
 }));

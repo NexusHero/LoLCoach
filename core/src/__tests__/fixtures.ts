@@ -4,7 +4,6 @@ export function makeStrategy(partial: Partial<Strategy> = {}): Strategy {
   return {
     winCondition: "mid",
     summary: "Scale into your mid-game power spike.",
-    immediateAction: "Farm safely and secure Drake when possible.",
     lateGamePlan: "Fight with full build and group for Baron.",
     ...partial,
   };

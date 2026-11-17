@@ -1,17 +1,7 @@
-import type { ChampionAbilities } from "./ddragonService.js";
-
 export interface ComponentRecipe {
   id: number;
   name: string;
   price: number;
-}
-
-export type SkillSlot = "Q" | "W" | "E";
-
-export interface ChampionTacticalMeta {
-  maxOrder: [SkillSlot, SkillSlot, SkillSlot];
-  keyThreatSpell: SkillSlot;
-  escapeSpell: SkillSlot;
 }
 
 /**
@@ -115,31 +105,6 @@ export const GRIEVOUS_WOUNDS_ITEM_IDS = new Set([3123, 3916, 3076, 3033, 3165, 3
 export const ARMOR_ITEM_IDS = new Set([3047, 3075, 3143, 3110, 3068, 3157, 6333, 3742, 3076, 3082, 1031]);
 export const MR_ITEM_IDS = new Set([3111, 2504, 4401, 3065, 3156, 3091, 3102, 3211, 1057]);
 
-export const ITEM_ABILITY_HASTE: Record<number, number> = {
-  2022: 5,  // Glowing Mote
-  3071: 20, // Black Cleaver
-  3078: 15, // Trinity Force
-  3133: 10, // Warhammer
-  3156: 15, // Maw
-  3165: 15, // Morello
-  3802: 10, // Lost Chapter
-  6610: 15, // Sundered Sky
-  6333: 15, // Death's Dance
-  3110: 20, // Frozen Heart
-  3065: 10, // Spirit Visage
-  3158: 15, // Ionian Boots
-  3161: 20, // Spear of Shojin
-  4629: 25, // Cosmic Drive
-  6655: 20, // Luden's Companion
-  6653: 15, // Liandry's
-  3003: 25, // Archangel's Staff
-  6692: 15, // Eclipse
-  6694: 15, // Serylda's Grudge
-  3190: 10, // Locket
-  6617: 20, // Moonstone
-  3107: 15, // Redemption
-};
-
 /**
  * Fallback AD / AP item values when running offline without DDragon item cache.
  */
@@ -154,124 +119,6 @@ export const FALLBACK_ITEM_DAMAGE_STATS: Record<number, { ad?: number; ap?: numb
   3157: { ap: 105 }, 3165: { ap: 75 }, 3802: { ap: 40 }, 4629: { ap: 70 },
   6653: { ap: 70 }, 6655: { ap: 85 }, 6675: { ap: 110 },
 };
-
-/**
- * Curated champion-specific skill-maxing order, primary opponent threat spell,
- * and local player defensive/mobility spell.
- */
-export const CHAMPION_TACTICAL_META: Record<string, ChampionTacticalMeta> = {
-  Ahri: { maxOrder: ["Q", "W", "E"], keyThreatSpell: "E", escapeSpell: "W" },
-  Aatrox: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "E" },
-  Akali: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "W" },
-  Anivia: { maxOrder: ["E", "Q", "W"], keyThreatSpell: "Q", escapeSpell: "W" },
-  Ashe: { maxOrder: ["W", "Q", "E"], keyThreatSpell: "W", escapeSpell: "E" },
-  AurelionSol: { maxOrder: ["Q", "W", "E"], keyThreatSpell: "E", escapeSpell: "W" },
-  Blitzcrank: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "Q", escapeSpell: "W" },
-  Caitlyn: { maxOrder: ["Q", "W", "E"], keyThreatSpell: "E", escapeSpell: "E" },
-  Camille: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "E" },
-  Cassiopeia: { maxOrder: ["E", "Q", "W"], keyThreatSpell: "W", escapeSpell: "W" },
-  Darius: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "E" },
-  Diana: { maxOrder: ["Q", "W", "E"], keyThreatSpell: "E", escapeSpell: "W" },
-  Ekko: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "E" },
-  Ezreal: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "E" },
-  Fiora: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "W", escapeSpell: "W" },
-  Fizz: { maxOrder: ["E", "W", "Q"], keyThreatSpell: "E", escapeSpell: "E" },
-  Garen: { maxOrder: ["E", "Q", "W"], keyThreatSpell: "Q", escapeSpell: "W" },
-  Gwen: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "W", escapeSpell: "E" },
-  Hwei: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "W" },
-  Irelia: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "W" },
-  Jax: { maxOrder: ["W", "Q", "E"], keyThreatSpell: "E", escapeSpell: "E" },
-  Jinx: { maxOrder: ["Q", "W", "E"], keyThreatSpell: "E", escapeSpell: "E" },
-  "Kai'Sa": { maxOrder: ["Q", "E", "W"], keyThreatSpell: "W", escapeSpell: "E" },
-  Katarina: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "E" },
-  Kayle: { maxOrder: ["E", "Q", "W"], keyThreatSpell: "Q", escapeSpell: "W" },
-  LeBlanc: { maxOrder: ["W", "Q", "E"], keyThreatSpell: "W", escapeSpell: "W" },
-  "Lee Sin": { maxOrder: ["Q", "W", "E"], keyThreatSpell: "Q", escapeSpell: "W" },
-  Leona: { maxOrder: ["W", "E", "Q"], keyThreatSpell: "E", escapeSpell: "W" },
-  Lucian: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "E" },
-  Lux: { maxOrder: ["E", "Q", "W"], keyThreatSpell: "Q", escapeSpell: "W" },
-  Malphite: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "Q", escapeSpell: "Q" },
-  Mordekaiser: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "W" },
-  Morgana: { maxOrder: ["W", "Q", "E"], keyThreatSpell: "Q", escapeSpell: "E" },
-  Nautilus: { maxOrder: ["Q", "W", "E"], keyThreatSpell: "Q", escapeSpell: "W" },
-  Orianna: { maxOrder: ["Q", "W", "E"], keyThreatSpell: "W", escapeSpell: "E" },
-  Ornn: { maxOrder: ["W", "Q", "E"], keyThreatSpell: "E", escapeSpell: "E" },
-  Pyke: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "Q", escapeSpell: "E" },
-  Renekton: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "E" },
-  Riven: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "W", escapeSpell: "E" },
-  Sett: { maxOrder: ["Q", "W", "E"], keyThreatSpell: "W", escapeSpell: "W" },
-  Shen: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "W" },
-  Sylas: { maxOrder: ["W", "E", "Q"], keyThreatSpell: "E", escapeSpell: "E" },
-  Syndra: { maxOrder: ["Q", "W", "E"], keyThreatSpell: "E", escapeSpell: "E" },
-  Thresh: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "Q", escapeSpell: "W" },
-  Tristana: { maxOrder: ["E", "Q", "W"], keyThreatSpell: "W", escapeSpell: "W" },
-  Vayne: { maxOrder: ["Q", "W", "E"], keyThreatSpell: "E", escapeSpell: "Q" },
-  Veigar: { maxOrder: ["Q", "W", "E"], keyThreatSpell: "E", escapeSpell: "E" },
-  Viktor: { maxOrder: ["E", "Q", "W"], keyThreatSpell: "W", escapeSpell: "W" },
-  Vladimir: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "W", escapeSpell: "W" },
-  Yasuo: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "W", escapeSpell: "W" },
-  Yone: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "E", escapeSpell: "E" },
-  Zed: { maxOrder: ["Q", "E", "W"], keyThreatSpell: "W", escapeSpell: "W" },
-};
-
-export function getChampionTacticalMeta(
-  championName: string,
-  abilities?: ChampionAbilities,
-): ChampionTacticalMeta {
-  const curated = CHAMPION_TACTICAL_META[championName];
-  if (curated) return curated;
-
-  const wBase = abilities?.wCooldown?.[0] ?? 14;
-  const eBase = abilities?.eCooldown?.[0] ?? 14;
-  const highCdSlot: SkillSlot = eBase > wBase ? "E" : "W";
-
-  return {
-    maxOrder: ["Q", "W", "E"],
-    keyThreatSpell: highCdSlot,
-    escapeSpell: highCdSlot,
-  };
-}
-
-const SUMMONER_BASE_COOLDOWNS: Array<[string, number]> = [
-  ["flash", 300],
-  ["teleport", 360],
-  ["ignite", 180],
-  ["exhaust", 210],
-  ["ghost", 240],
-  ["heal", 240],
-  ["cleanse", 240],
-  ["barrier", 180],
-  ["smite", 90],
-];
-
-export function computeSummonerSpellCooldown(
-  displayName: string,
-  level: number,
-  gameTimeSec: number,
-  summonerHaste: number,
-): { name: string; cooldown: number } | undefined {
-  const lower = displayName.trim().toLowerCase();
-  if (!lower) return undefined;
-
-  let canonicalName = displayName.trim();
-  let baseCd = 240;
-
-  if (lower.includes("teleport")) {
-    canonicalName = gameTimeSec >= 600 ? "Unleashed TP" : "Teleport";
-    const lvlFactor = (Math.max(1, Math.min(18, level)) - 1) / 17;
-    baseCd = gameTimeSec >= 600
-      ? Math.round(330 - lvlFactor * 90)
-      : Math.round(360 - lvlFactor * 120);
-  } else {
-    const match = SUMMONER_BASE_COOLDOWNS.find(([key]) => lower.includes(key));
-    if (!match) return undefined;
-    canonicalName = match[0].charAt(0).toUpperCase() + match[0].slice(1);
-    baseCd = match[1];
-  }
-
-  const cooldown = Math.max(15, Math.round(baseCd * (100 / (100 + summonerHaste))));
-  return { name: canonicalName, cooldown };
-}
 
 /**
  * Passive/stat-stick substitutes for active items when `preferPassiveItems` is enabled.

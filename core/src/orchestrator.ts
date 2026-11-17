@@ -27,14 +27,9 @@ import {
   computePrimaryThreat,
   computeTeamDamageProfile,
   computeNextBestBuy,
-  computeEnemyCooldowns,
   findLaneOpponent,
 } from "./tacticalAnalyzer.js";
-import {
-  computeObjectives,
-  computeMacroAlerts,
-  findObjectiveSetupTrigger,
-} from "./macroTracker.js";
+import { computeObjectives, computeMacroAlerts } from "./macroTracker.js";
 import { PlayerProfileService } from "./playerProfileService.js";
 import { VectorMemoryService, type EmbeddingConfig } from "./vectorMemoryService.js";
 import { TacticalCommandService } from "./tacticalCommandService.js";
@@ -51,7 +46,6 @@ export class BridgeOrchestrator {
   private correlationCounter = 0;
   private buildFocus: BuildFocus = DEFAULT_BUILD_FOCUS;
   private preferPassiveItems = false;
-  private lastObjectiveTriggerKey = "";
   private readonly profileService = new PlayerProfileService();
   private readonly vectorMemory = new VectorMemoryService();
   private readonly commandService = new TacticalCommandService(this.vectorMemory);
@@ -68,26 +62,23 @@ export class BridgeOrchestrator {
     if (this.config.tokenBudget) {
       this.engine.setTokenBudget(this.config.tokenBudget);
     }
-    this.profileService.load().catch(() => {});
-    this.vectorMemory.load().catch(() => {});
   }
 
-  private async computeTacticalInsights(state: ParsedGameState): Promise<TacticalInsights> {
+  /** Loads the stored player profile and matchup memory from disk. */
+  async initialize(): Promise<void> {
+    await Promise.all([this.profileService.load(), this.vectorMemory.load()]);
+  }
+
+  private computeTacticalInsights(state: ParsedGameState): TacticalInsights {
     const telemetry = this.profileService.observeTick(state);
-    const liveOverrides = this.commandService.getOverrides(state.gameTime);
+    const liveOverrides = this.commandService.getOverrides();
     const lastCoachExchange = this.commandService.getLastExchange();
     const objectives = computeObjectives(state);
-    const macroAlerts = computeMacroAlerts(
-      state,
-      objectives,
-      telemetry.goldHoardingSeconds,
-      liveOverrides.campedStatus ?? "normal",
-    );
+    const macroAlerts = computeMacroAlerts(state, objectives, telemetry.goldHoardingSeconds);
     const primaryThreat = computePrimaryThreat(state);
     const teamDamageProfile = computeTeamDamageProfile(state, liveOverrides.enemyBuildOverrides);
     const recommendedItems = this.engine.getLastRecommendedItems?.() ?? [];
     const nextBestBuy = computeNextBestBuy(state, recommendedItems, this.preferPassiveItems);
-    const enemyCooldowns = await computeEnemyCooldowns(state, liveOverrides.laneOpponentOverride);
 
     this.engine.setLiveOverrides?.(liveOverrides);
 
@@ -95,7 +86,6 @@ export class BridgeOrchestrator {
       ...(primaryThreat ? { primaryThreat } : {}),
       teamDamageProfile,
       ...(nextBestBuy ? { nextBestBuy } : {}),
-      ...(enemyCooldowns ? { enemyCooldowns } : {}),
       macroAlerts,
       objectives,
       csPerMin: telemetry.csPerMin,
@@ -103,6 +93,7 @@ export class BridgeOrchestrator {
       buildFocus: this.buildFocus,
       preferPassiveItems: this.preferPassiveItems,
       liveOverrides,
+      reviewMarkers: this.commandService.getReviewMarkers(),
       ...(lastCoachExchange ? { lastCoachExchange } : {}),
     };
   }
@@ -119,7 +110,7 @@ export class BridgeOrchestrator {
     const profile = this.profileService.getProfile();
     this.engine.setHabitWarnings?.(profile.habitWarnings);
 
-    let insights = await this.computeTacticalInsights(state);
+    let insights = this.computeTacticalInsights(state);
     const events = this.eventDetector.detect(state);
 
     // Retrieve Vector RAG matchup memories when a match starts
@@ -133,17 +124,6 @@ export class BridgeOrchestrator {
         3,
       );
       this.engine.setVectorMemories?.(memories);
-    }
-
-    // Check Objective T-60s Setup Window trigger
-    const setupObj = findObjectiveSetupTrigger(insights.objectives);
-    if (setupObj) {
-      const spawnMinuteBucket = Math.floor((state.gameTime + setupObj.secondsUntilSpawn) / 60);
-      const triggerKey = `${setupObj.type}_${spawnMinuteBucket}`;
-      if (triggerKey !== this.lastObjectiveTriggerKey) {
-        this.lastObjectiveTriggerKey = triggerKey;
-        await this.sendRecommendation(state, "OBJECTIVE_SETUP_WINDOW", insights);
-      }
     }
 
     for (const event of events) {
@@ -231,7 +211,7 @@ export class BridgeOrchestrator {
       }
     }
 
-    const insights = this.lastState ? await this.computeTacticalInsights(this.lastState) : undefined;
+    const insights = this.lastState ? this.computeTacticalInsights(this.lastState) : undefined;
     this.wsServer.broadcast({
       event: "COACH_COMMAND_RESULT",
       timestamp: this.clock(),
@@ -251,7 +231,7 @@ export class BridgeOrchestrator {
     const cleared = this.commandService.clearOverride(key);
     if (!cleared) return;
     if (this.lastState) {
-      const insights = await this.computeTacticalInsights(this.lastState);
+      const insights = this.computeTacticalInsights(this.lastState);
       this.wsServer.broadcast({
         event: "GAME_TICK",
         timestamp: this.clock(),
@@ -268,7 +248,7 @@ export class BridgeOrchestrator {
       return;
     }
     Logger.info("[Orchestrator] Manual analysis triggered.");
-    const insights = await this.computeTacticalInsights(this.lastState);
+    const insights = this.computeTacticalInsights(this.lastState);
     await this.sendRecommendation(this.lastState, "MANUAL", insights);
   }
 
@@ -280,10 +260,11 @@ export class BridgeOrchestrator {
       const opp = prevState
         ? findLaneOpponent(prevState, myPos, this.commandService.getOverrides().laneOpponentOverride)
         : undefined;
+      const reviewMarkers = this.commandService.getReviewMarkers();
+      if (reviewMarkers.length > 0) autopsy.reviewMarkers = reviewMarkers;
       this.vectorMemory.storeAutopsy(autopsy, opp?.championName).catch(() => {});
     }
     this.lastState = null;
-    this.lastObjectiveTriggerKey = "";
     this.commandService.resetMatch();
     this.eventDetector.reset();
     this.engine.reset();

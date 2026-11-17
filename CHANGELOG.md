@@ -8,7 +8,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · Versioning: 
 
 ## [Unreleased]
 
+### Removed
+- Live features that Riot's third-party policy does not permit: enemy ability and summoner-spell cooldown estimates and 1-click timers, the jungle gank-window, shutdown and level-6 alerts, and the LLM "immediate action" and "counter-play" lines. The live HUD now shows objective countdowns, own unspent gold, the next buy and the build plan only.
+- The LLM call on the objective setup window; the LLM now runs on game start, item purchase, death, high gold and manual refresh.
+
+### Fixed
+- Objective timers updated to the current season: Voidgrubs spawn at 8:00 as one camp of three and leave at 14:45, Rift Herald spawns at 15:00. Elder Dragon is now tracked after a team takes its fourth dragon.
+
 ### Changed
+- The coach command bar sets **review markers** (F1, "Marker: …", or any free-text note) that are listed after the match, instead of tracking enemy spells.
 - Redesigned the desktop UI to the **Elevated** glass visual language — violet AI accent, champagne win-condition accent, frosted-glass cards over a gradient canvas, a refreshed type scale, and an in-game **hero card** that leads with the single most important action. The palette is exposed as an `AppColors` `ThemeExtension` (dark + light).
 
 ### Added

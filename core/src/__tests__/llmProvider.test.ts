@@ -134,7 +134,7 @@ describe("buildUserPrompt", () => {
 
     const prompt = await buildUserPrompt(state, "risky");
 
-    expect(prompt).toContain("Playstyle: AGGRESSIVE");
+    expect(prompt).toContain("Build style: AGGRESSIVE");
   });
 
   it("buildUserPrompt_SafeLevel_ContainsCautiousDirective", async () => {
@@ -142,7 +142,7 @@ describe("buildUserPrompt", () => {
 
     const prompt = await buildUserPrompt(state, "safe");
 
-    expect(prompt).toContain("Playstyle: SAFE");
+    expect(prompt).toContain("Build style: SAFE");
   });
 
   it("buildUserPrompt_DefaultLevel_ContainsBalancedDirective", async () => {
@@ -150,7 +150,7 @@ describe("buildUserPrompt", () => {
 
     const prompt = await buildUserPrompt(state);
 
-    expect(prompt).toContain("Playstyle: BALANCED");
+    expect(prompt).toContain("Build style: BALANCED");
   });
 
   it("buildUserPrompt_NoOpponent_ShowsUnknown", async () => {
@@ -187,7 +187,6 @@ describe("parseAnalysisResponse", () => {
       strategy: {
         winCondition: "late",
         summary: "Scale hard.",
-        immediateAction: "Farm under tower.",
         lateGamePlan: "Destroy with full build.",
       },
     });
@@ -200,7 +199,7 @@ describe("parseAnalysisResponse", () => {
   });
 
   it("parseAnalysisResponse_JsonWithMarkdownCodeBlock_StillParses", () => {
-    const raw = "```json\n{\"itemReasoning\":\"Good items\",\"strategy\":{\"winCondition\":\"mid\",\"summary\":\"s\",\"immediateAction\":\"a\",\"lateGamePlan\":\"b\"}}\n```";
+    const raw = "```json\n{\"itemReasoning\":\"Good items\",\"strategy\":{\"winCondition\":\"mid\",\"summary\":\"s\",\"lateGamePlan\":\"b\"}}\n```";
 
     const result = parseAnalysisResponse(raw);
 
@@ -231,7 +230,7 @@ describe("parseAnalysisResponse", () => {
         { id: 3102, name: "Banshee's Veil", reason: "Poke comp" },
         { id: 3047, name: "Plated Steelcaps", reason: "AD heavy" },
       ],
-      strategy: { winCondition: "mid", summary: "s", immediateAction: "a", lateGamePlan: "b" },
+      strategy: { winCondition: "mid", summary: "s", lateGamePlan: "b" },
     });
 
     const result = parseAnalysisResponse(raw);
@@ -244,7 +243,7 @@ describe("parseAnalysisResponse", () => {
     const raw = JSON.stringify({
       itemReasoning: "Good items",
       situationalItems: [],
-      strategy: { winCondition: "mid", summary: "s", immediateAction: "a", lateGamePlan: "b" },
+      strategy: { winCondition: "mid", summary: "s", lateGamePlan: "b" },
     });
 
     const result = parseAnalysisResponse(raw);
@@ -256,7 +255,7 @@ describe("parseAnalysisResponse", () => {
     const raw = JSON.stringify({
       itemReasoning: "Good items",
       situationalItems: [{ id: 0, name: "", reason: "bad" }],
-      strategy: { winCondition: "mid", summary: "s", immediateAction: "a", lateGamePlan: "b" },
+      strategy: { winCondition: "mid", summary: "s", lateGamePlan: "b" },
     });
 
     const result = parseAnalysisResponse(raw);
