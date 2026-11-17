@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lol_coach/controllers/settings_controller.dart';
 import 'package:lol_coach/providers.dart';
 import 'package:lol_coach/widgets/common/app_background.dart';
 import 'package:lol_coach/widgets/connection_form.dart';
+import 'package:material_ui/material_ui.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({required this.onConnected, super.key});

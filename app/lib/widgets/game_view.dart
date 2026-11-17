@@ -1,5 +1,4 @@
 // ignore_for_file: lines_longer_than_80_chars
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lol_coach/models/game_state.dart';
 import 'package:lol_coach/models/recommendation.dart';
@@ -15,6 +14,7 @@ import 'package:lol_coach/widgets/macro_alert_strip.dart';
 import 'package:lol_coach/widgets/recommendation_panel.dart';
 import 'package:lol_coach/widgets/scoreboard.dart';
 import 'package:lol_coach/widgets/tactical_comms_bar.dart';
+import 'package:material_ui/material_ui.dart';
 
 class GameView extends StatelessWidget {
   const GameView({

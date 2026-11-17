@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:lol_coach/services/coach_service.dart';
 import 'package:lol_coach/services/storage_service.dart';
 import 'package:lol_coach/services/ws_client.dart';
+import 'package:material_ui/material_ui.dart';
 
 typedef ModelOption = ({String id, String label});
 

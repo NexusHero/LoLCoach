@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Semantic colour palette exposed as a [ThemeExtension] so the same field
 /// names resolve to different values per theme (dark / light).

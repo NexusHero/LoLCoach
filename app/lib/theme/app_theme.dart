@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:lol_coach/theme/app_colors.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Builds the app's [ThemeData] for both light and dark from a single
 /// [AppColors] palette, registering that palette as a [ThemeExtension] so

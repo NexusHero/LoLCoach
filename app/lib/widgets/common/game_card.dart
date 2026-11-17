@@ -1,7 +1,7 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:lol_coach/theme/app_colors.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// The frosted-glass panel primitive every card flows through.
 ///

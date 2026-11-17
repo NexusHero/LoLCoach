@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lol_coach/controllers/theme_controller.dart';
 import 'package:lol_coach/providers.dart';
@@ -9,6 +9,7 @@ import 'package:lol_coach/screens/main_screen.dart';
 import 'package:lol_coach/services/storage_service.dart';
 import 'package:lol_coach/theme/app_theme.dart';
 import 'package:lol_coach/utils/ddragon.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:lol_coach/providers.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'theme_controller.g.dart';

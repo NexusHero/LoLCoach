@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:lol_coach/models/strategy.dart';
 import 'package:lol_coach/models/token_usage.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/champ_avatar.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Visual matchup duel pill with champion mini-avatars when available.
 class MatchupDuelChip extends StatelessWidget {

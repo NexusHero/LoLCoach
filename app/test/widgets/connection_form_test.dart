@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lol_coach/controllers/settings_controller.dart';
@@ -8,6 +7,7 @@ import 'package:lol_coach/services/storage_service.dart';
 import 'package:lol_coach/services/ws_client.dart';
 import 'package:lol_coach/theme/app_theme.dart';
 import 'package:lol_coach/widgets/connection_form.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 

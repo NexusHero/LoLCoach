@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:lol_coach/theme/app_colors.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Segmented control for the coaching playstyle.
 /// Always one of 'safe' | 'normal' | 'risky' — never multiple at once.

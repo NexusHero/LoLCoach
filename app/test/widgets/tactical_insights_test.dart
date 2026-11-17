@@ -1,5 +1,4 @@
 // ignore_for_file: lines_longer_than_80_chars
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lol_coach/models/game_state.dart';
 import 'package:lol_coach/models/recommendation.dart';
@@ -10,6 +9,7 @@ import 'package:lol_coach/widgets/challenger_pro_hud.dart';
 import 'package:lol_coach/widgets/macro_alert_strip.dart';
 import 'package:lol_coach/widgets/recommendation_panel.dart';
 import 'package:lol_coach/widgets/tactical_comms_bar.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   group('Challenger Coaching Engine HUD widgets', () {
