@@ -53,18 +53,9 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        # The committed pubspec.lock was generated with Flutter 3.44.8. Enforce it
-        # again (--enforce-lockfile) once it is regenerated with 3.50.
-        run: flutter pub get
+        # pubspec.lock is generated with the pinned Flutter version above.
+        run: flutter pub get --enforce-lockfile
         working-directory: app
-
-      # TEMPORARY: export the lockfile resolved by Flutter 3.50 so it can be
-      # committed and enforced. Removed again in the follow-up commit.
-      - name: Upload resolved lockfile
-        uses: actions/upload-artifact@v7
-        with:
-          name: pubspec-lock-flutter-3.50.0
-          path: app/pubspec.lock
 
       - name: Analyze
         run: flutter analyze
