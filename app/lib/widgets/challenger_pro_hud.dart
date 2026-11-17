@@ -7,16 +7,13 @@ import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/build_focus_selector.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
-import 'package:lol_coach/widgets/common/interactive_cooldown_bar.dart';
 import 'package:lol_coach/widgets/common/item_slot.dart';
 
-/// Ultra-focused 0.2s-glance Challenger / High-Elo HUD mode.
-/// Strips away all redundant native LoL HUD data (own HP/AD/MR, own inventory,
-/// 10-player Tab scoreboard) and surfaces only the 4 invisible high-elo edges:
-/// 1. Immediate Play + Component Breakpoint Math
-/// 2. Pure Icon Build Strip + BuildFocus Quick-Switch
-/// 3. Opponent Q/W/E/R + Summoner Spell Cooldown Boxes (1-Click Track)
-/// 4. CS/m Tempo Gauge vs Role Benchmark
+/// Reduced glance HUD. Shows only what the app can state as fact and what
+/// Riot's third-party policy permits live:
+/// 1. Build plan + next component with gold math
+/// 2. Icon build strip + BuildFocus quick-switch
+/// 3. CS/m tempo against the role benchmark
 class ChallengerProHud extends StatelessWidget {
   const ChallengerProHud({
     required this.gameState,
@@ -39,22 +36,17 @@ class ChallengerProHud extends StatelessWidget {
   final bool preferPassiveItems;
   final ValueChanged<bool>? onPreferPassiveChanged;
 
-  String get _immediateAction {
-    final s = recommendation?.strategy;
-    final a = s?.immediateAction.trim();
-    if (a != null && a.isNotEmpty) return a;
-    final sum = s?.summary.trim();
-    if (sum != null && sum.isNotEmpty) return sum;
-    return recommendation?.reasoning ?? 'Play on wave tempo & track jungler.';
+  String get _buildPlan {
+    final summary = recommendation?.strategy?.summary.trim();
+    if (summary != null && summary.isNotEmpty) return summary;
+    return recommendation?.reasoning ?? 'Waiting for the first build plan.';
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final nextBuy = tacticalInsights?.nextBestBuy;
-    final cds = tacticalInsights?.enemyCooldowns;
     final items = recommendation?.items ?? const [];
-    final counterPlay = recommendation?.strategy?.counterPlay;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -70,12 +62,12 @@ class ChallengerProHud extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'IMMEDIATE PLAY',
+                    'BUILD PLAN',
                     style: AppTextStyles.eyebrow.copyWith(color: colors.magic),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _immediateAction,
+                    _buildPlan,
                     style: AppTextStyles.hero.copyWith(fontSize: 22),
                   ),
                   if (nextBuy != null) ...[
@@ -117,14 +109,6 @@ class ChallengerProHud extends StatelessWidget {
         final rightCol = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (cds != null)
-              ProCooldownCard(
-                cooldowns: cds,
-                counterPlay: counterPlay,
-                activeTimers:
-                    tacticalInsights?.liveOverrides?.activeTimers ?? const [],
-              ),
-            if (cds != null) const SizedBox(height: 14),
             if (tacticalInsights != null)
               _ProTempoCard(insights: tacticalInsights!),
           ],
@@ -182,7 +166,7 @@ class _ProNextBuyBox extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'BUY NOW: ${buy.itemName.toUpperCase()} (${buy.price}g)',
+                  'NEXT BUY: ${buy.itemName.toUpperCase()} (${buy.price}g)',
                   style: AppTextStyles.bodyBold.copyWith(color: colors.gold),
                 ),
                 if (buy.breakpointHint != null) ...[
@@ -260,9 +244,7 @@ class _ProTempoCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  onPace
-                      ? 'On Challenger pace — keep catching side waves before grouping'
-                      : 'Below target pace — prioritize side wave crash before fights',
+                  onPace ? 'On target pace' : 'Below target pace',
                   style: AppTextStyles.caption.copyWith(
                     color: colors.textSecondary,
                   ),

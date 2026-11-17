@@ -146,7 +146,6 @@ describe("getHeuristicRecommendations", () => {
     expect(rec.strategy).toBeDefined();
     expect(["early", "mid", "late"]).toContain(rec.strategy.winCondition);
     expect(rec.strategy.summary).toBeTruthy();
-    expect(rec.strategy.immediateAction).toBeTruthy();
     expect(rec.strategy.lateGamePlan).toBeTruthy();
   });
 });

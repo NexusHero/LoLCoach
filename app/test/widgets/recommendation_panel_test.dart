@@ -33,7 +33,7 @@ void main() {
         );
 
         // The hero eyebrow + the core item, rendered in the new layout.
-        expect(find.text('DO THIS NOW'), findsOneWidget);
+        expect(find.text('BUILD PLAN'), findsOneWidget);
         expect(find.text("Banshee's Veil"), findsOneWidget);
         expect(find.text('Core'), findsOneWidget);
         expect(find.text('Blocks initial burst combo'), findsOneWidget);

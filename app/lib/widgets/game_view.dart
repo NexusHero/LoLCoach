@@ -92,7 +92,6 @@ class GameView extends StatelessWidget {
 
   Map<ShortcutActivator, VoidCallback> _buildHotkeys() {
     final opp = _laneOpponent ??
-        tacticalInsights?.enemyCooldowns?.championName ??
         (gameState.enemies.isNotEmpty
             ? gameState.enemies.first.championName
             : 'Enemy');
@@ -106,9 +105,7 @@ class GameView extends StatelessWidget {
     return <ShortcutActivator, VoidCallback>{
       if (onSendCoachCommand != null) ...{
         const SingleActivator(LogicalKeyboardKey.f1): () =>
-            onSendCoachCommand!('$opp Flash'),
-        const SingleActivator(LogicalKeyboardKey.f2): () =>
-            onSendCoachCommand!('$opp R'),
+            onSendCoachCommand!('Marker'),
         const SingleActivator(LogicalKeyboardKey.f3): () =>
             onSendCoachCommand!('Ich werde gecampt'),
         if (swapTarget != null)

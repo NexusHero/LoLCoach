@@ -41,8 +41,8 @@ const DEFAULT_LLM_COOLDOWN_MS = config.llm.defaultCooldownMs;
 const args = process.argv.slice(2);
 const parentPidArg = args.find(a => a.startsWith('--parent-pid='));
 if (parentPidArg) {
-  const parentPid = parseInt(parentPidArg.split('=')[1]);
-  if (!isNaN(parentPid)) {
+  const parentPid = Number.parseInt(parentPidArg.split('=')[1], 10);
+  if (!Number.isNaN(parentPid)) {
     Logger.info(`[Main] Watching parent PID: ${parentPid}`);
     setInterval(() => {
       try {
@@ -105,15 +105,22 @@ container.register(RECOMMENDATION_ENGINE_TOKEN, { useToken: RecommendationEngine
 // then wire the one circular edge explicitly.
 const wsServer = container.resolve(BridgeWsServer);
 const orchestrator = container.resolve(BridgeOrchestrator);
+orchestrator.initialize().catch((err) => {
+  Logger.warn("[Main] Failed to load stored profile or matchup memory:", err);
+});
 const messageRouter = container.resolve(MessageRouter);
 wsServer.setMessageHandler((ws, message) => messageRouter.handle(ws, message));
 
 // Backward compatible: use ANTHROPIC_API_KEY from .env if present
 if (process.env.ANTHROPIC_API_KEY) {
-  createLlmProvider("claude", process.env.ANTHROPIC_API_KEY).then((provider) => {
-    orchestrator.setLlmProvider(provider);
-    Logger.info("[Main] Using Claude provider from ANTHROPIC_API_KEY env var.");
-  });
+  createLlmProvider("claude", process.env.ANTHROPIC_API_KEY)
+    .then((provider) => {
+      orchestrator.setLlmProvider(provider);
+      Logger.info("[Main] Using Claude provider from ANTHROPIC_API_KEY env var.");
+    })
+    .catch((err) => {
+      Logger.error("[Main] Failed to create Claude provider from ANTHROPIC_API_KEY:", err);
+    });
 }
 
 const poller = new LiveClientPoller(

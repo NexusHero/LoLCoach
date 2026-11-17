@@ -42,7 +42,7 @@ export class OpenAiProvider implements LlmProvider {
       });
 
       const text = response.choices[0]?.message?.content;
-      if (!text) return { reasoning: "", strategy: { winCondition: "mid", summary: "", immediateAction: "", lateGamePlan: "" } };
+      if (!text) return { reasoning: "", strategy: { winCondition: "mid", summary: "", lateGamePlan: "" } };
 
       const tokenUsage: TokenUsage = {
         input: response.usage?.prompt_tokens ?? 0,

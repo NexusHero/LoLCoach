@@ -19,7 +19,6 @@ export const validJsonResponse = JSON.stringify({
   strategy: {
     winCondition: "early",
     summary: "Push your lead.",
-    immediateAction: "Take objectives.",
     lateGamePlan: "End fast.",
   },
 });
@@ -74,7 +73,7 @@ export function runLlmProviderContract(setup: ProviderTestSetup) {
 
       await provider.getAnalysis(state);
 
-      setup.assertStandardRequest(mockApi);
+      expect(() => setup.assertStandardRequest(mockApi)).not.toThrow();
     });
 
     it("getAnalysis_DefaultModel_UsesExpectedModel", async () => {
@@ -83,7 +82,7 @@ export function runLlmProviderContract(setup: ProviderTestSetup) {
 
       await provider.getAnalysis(makeGameState());
 
-      setup.assertModelPassed(mockApi, setup.expectedDefaultModel);
+      expect(() => setup.assertModelPassed(mockApi, setup.expectedDefaultModel)).not.toThrow();
     });
 
     it("getAnalysis_CustomModel_UsesSpecifiedModel", async () => {
@@ -92,7 +91,7 @@ export function runLlmProviderContract(setup: ProviderTestSetup) {
 
       await provider.getAnalysis(makeGameState());
 
-      setup.assertModelPassed(mockApi, setup.expectedCustomModel);
+      expect(() => setup.assertModelPassed(mockApi, setup.expectedCustomModel)).not.toThrow();
     });
   });
 }

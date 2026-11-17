@@ -192,24 +192,6 @@ export interface NextBestBuy {
   breakpointHint?: string;
 }
 
-export interface EnemySummonerCooldown {
-  name: string;
-  cooldown: number;
-}
-
-export interface EnemyCooldowns {
-  championName: string;
-  level: number;
-  abilityHaste: number;
-  q: number;
-  w: number;
-  e: number;
-  r: number;
-  keyThreatSpell?: "Q" | "W" | "E" | "R";
-  summonerSpells?: EnemySummonerCooldown[];
-  keyThreatSummary: string;
-}
-
 export type MacroAlertPriority = "critical" | "warning" | "info";
 export type MacroAlertCategory = "danger" | "objective" | "economy";
 
@@ -222,27 +204,23 @@ export interface MacroAlert {
 }
 
 export interface ObjectiveTimer {
-  type: "dragon" | "baron" | "herald" | "grubs";
+  type: "dragon" | "elder" | "baron" | "herald" | "grubs";
   label: string;
   secondsUntilSpawn: number;
   status: "alive" | "spawning_soon" | "countdown";
 }
 
-export interface ActiveSpellTimer {
-  key: string;
-  label: string;
-  championName: string;
-  remainingSeconds: number;
-  totalSeconds: number;
-  expiresAtGameTime: number;
+/** A moment the player flagged during the match for the post-game review. */
+export interface ReviewMarker {
+  id: string;
+  gameTime: number;
+  note: string;
 }
 
 export interface LiveTacticalOverrides {
   laneOpponentOverride?: string;
   campedStatus?: "normal" | "camped" | "weaksided";
   enemyBuildOverrides: Record<string, "ad" | "ap" | "tank">;
-  tacticalNotes: string[];
-  activeTimers: ActiveSpellTimer[];
 }
 
 export interface CoachExchange {
@@ -275,7 +253,6 @@ export interface TacticalInsights {
     mrStacking: boolean;
   };
   nextBestBuy?: NextBestBuy;
-  enemyCooldowns?: EnemyCooldowns;
   macroAlerts: MacroAlert[];
   objectives: ObjectiveTimer[];
   csPerMin: number;
@@ -283,6 +260,7 @@ export interface TacticalInsights {
   buildFocus: BuildFocus;
   preferPassiveItems: boolean;
   liveOverrides?: LiveTacticalOverrides;
+  reviewMarkers: ReviewMarker[];
   lastCoachExchange?: CoachExchange;
 }
 
@@ -295,6 +273,7 @@ export interface PostGameAutopsy {
   targetCsPerMin: number;
   praise: string;
   mistakes: string[];
+  reviewMarkers?: ReviewMarker[];
   timestamp: number;
 }
 
@@ -337,10 +316,8 @@ export interface WsMessage {
 export interface Strategy {
   winCondition: "early" | "mid" | "late";
   summary: string;
-  immediateAction: string;
   lateGamePlan: string;
   laneMatchupAnalysis?: string;
-  counterPlay?: string;
 }
 
 export interface ItemRecommendation {

@@ -49,6 +49,7 @@ jobs:
       # Install dependencies first, then run the license checker
       # Fails if any package uses a strict viral license (GPL) or has no license
       run: |
-        npm ci
-        npx license-checker-rseidelsohn --summary --failOn "GPL; AGPL" --onlyAllow "MIT; ISC; Apache-2.0; BSD-2-Clause; BSD-3-Clause; CC0-1.0; Unlicense; Python-2.0; Zlib" || echo "Warning: Unknown or restrictive licenses found"
+        npm ci --ignore-scripts
+        npm install --ignore-scripts --no-save license-checker-rseidelsohn@5.0.1
+        ./node_modules/.bin/license-checker-rseidelsohn --summary --failOn "GPL; AGPL" --onlyAllow "MIT; ISC; Apache-2.0; BSD-2-Clause; BSD-3-Clause; CC0-1.0; Unlicense; Python-2.0; Zlib" || echo "Warning: Unknown or restrictive licenses found"
 

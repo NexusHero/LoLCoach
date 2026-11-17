@@ -32,18 +32,18 @@ void main() {
           },
           'macroAlerts': [
             {
-              'id': 'shutdown_protection',
-              'priority': 'critical',
-              'category': 'danger',
-              'title': 'PROTECT SHUTDOWN (5/0/2)',
-              'detail': 'High bounty on your head',
-            },
-            {
-              'id': 'obj_setup_dragon',
+              'id': 'obj_spawn_dragon',
               'priority': 'warning',
               'category': 'objective',
-              'title': 'DRAGON IN 55s — RESET NOW',
-              'detail': 'Push wave & recall',
+              'title': 'DRAGON IN 55s',
+              'detail': 'Spawns soon — you hold 1600g',
+            },
+            {
+              'id': 'gold_hoarding',
+              'priority': 'info',
+              'category': 'economy',
+              'title': 'UNSPENT GOLD: 1600g',
+              'detail': 'Enough gold for your next item component',
             },
           ],
           'objectives': [
@@ -65,8 +65,8 @@ void main() {
           ),
         );
 
-        expect(find.text('PROTECT SHUTDOWN (5/0/2)'), findsOneWidget);
-        expect(find.text('DRAGON IN 55s — RESET NOW'), findsOneWidget);
+        expect(find.text('DRAGON IN 55s'), findsOneWidget);
+        expect(find.text('UNSPENT GOLD: 1600g'), findsOneWidget);
         expect(find.text('Dragon: 0:55'), findsOneWidget);
         expect(find.textContaining('Fed Threat: Zed'), findsOneWidget);
         expect(find.text('COMP 70% AD'), findsOneWidget);
@@ -76,7 +76,7 @@ void main() {
     );
 
     testWidgets(
-      'RecommendationPanel_WithNextBestBuyAndEnemyCooldowns_RendersComponentAndCdBar',
+      'RecommendationPanel_WithNextBestBuy_RendersComponentAndBuildPlanWithoutCooldowns',
       (tester) async {
         const rec = ItemRecommendation(
           items: [
@@ -93,7 +93,6 @@ void main() {
           strategy: Strategy(
             winCondition: WinCondition.mid,
             summary: 'Win mid-game',
-            immediateAction: 'Short trade after Zed W',
             lateGamePlan: 'Split push',
           ),
         );
@@ -107,21 +106,6 @@ void main() {
             targetItemId: 3078,
             targetItemName: 'Trinity Force',
             breakpointHint: 'or +120g (1 wave) for Phage',
-          ),
-          enemyCooldowns: EnemyCooldowns(
-            championName: 'Zed',
-            level: 9,
-            abilityHaste: 20,
-            q: 5,
-            w: 16,
-            e: 4,
-            r: 85,
-            keyThreatSpell: 'W',
-            summonerSpells: [
-              EnemySummonerCooldown(name: 'Flash', cooldown: 254),
-              EnemySummonerCooldown(name: 'Ignite', cooldown: 153),
-            ],
-            keyThreatSummary: 'His W (16s) vs your W (18s) -> 2s vulnerable!',
           ),
         );
 
@@ -139,31 +123,17 @@ void main() {
           ),
         );
 
-        expect(find.text('BUY NOW: SHEEN (900g)'), findsOneWidget);
+        expect(find.text('NEXT BUY: SHEEN (900g)'), findsOneWidget);
         expect(find.text('or +120g (1 wave) for Phage'), findsOneWidget);
-        expect(
-          find.text('His W (16s) vs your W (18s) -> 2s vulnerable!'),
-          findsOneWidget,
-        );
-        expect(find.text('16s'), findsOneWidget);
-        expect(find.text('FLASH'), findsOneWidget);
-        expect(find.text('4:14'), findsOneWidget);
-
-        // 1-Click on W starts live countdown ("W CD") and ticks down after 1s
-        await tester.tap(find.text('16s'));
-        await tester.pump(const Duration(seconds: 1));
-        expect(find.text('W CD'), findsOneWidget);
-        expect(find.text('15s'), findsOneWidget);
-
-        // Second click resets the timer back to ready ("W" / "16s")
-        await tester.tap(find.text('15s'));
-        await tester.pump();
-        expect(find.text('16s'), findsOneWidget);
+        expect(find.text('BUILD PLAN'), findsOneWidget);
+        expect(find.text('Win mid-game'), findsOneWidget);
+        expect(find.textContaining('vulnerable'), findsNothing);
+        expect(find.text('FLASH'), findsNothing);
       },
     );
 
     testWidgets(
-      'ChallengerProHud_Rendered_ShowsHighContrastPlayCooldownsAndTempoWithoutRedundantStats',
+      'ChallengerProHud_Rendered_ShowsBuildPlanNextBuyAndTempoWithoutCooldowns',
       (tester) async {
         const state = ParsedGameState(
           gameTime: 600,
@@ -217,9 +187,7 @@ void main() {
           strategy: Strategy(
             winCondition: WinCondition.mid,
             summary: 'Play around Charm',
-            immediateAction: 'Hold E until Zed exits R behind you',
             lateGamePlan: 'Pick side lane',
-            counterPlay: 'Never use R1 forward while Zed W is up',
           ),
         );
 
@@ -232,16 +200,6 @@ void main() {
             targetItemId: 3157,
             targetItemName: "Zhonya's Hourglass",
             breakpointHint: '+50g (1 wave) needed',
-          ),
-          enemyCooldowns: EnemyCooldowns(
-            championName: 'Zed',
-            level: 9,
-            abilityHaste: 15,
-            q: 5,
-            w: 17,
-            e: 4,
-            r: 90,
-            keyThreatSummary: 'Punish Zed W (17s CD) after cast!',
           ),
           csPerMin: 8.4,
         );
@@ -260,39 +218,33 @@ void main() {
           ),
         );
 
+        expect(find.text('BUILD PLAN'), findsOneWidget);
+        expect(find.text('Play around Charm'), findsOneWidget);
         expect(
-          find.text('Hold E until Zed exits R behind you'),
+          find.text('NEXT BUY: NEEDLESSLY LARGE ROD (1200g)'),
           findsOneWidget,
         );
-        expect(find.text('Punish Zed W (17s CD) after cast!'), findsOneWidget);
         expect(find.text('8.4 / 8.0'), findsOneWidget);
-        expect(find.text('17s'), findsOneWidget);
+        expect(find.textContaining('CD'), findsNothing);
       },
     );
 
     testWidgets(
-      'TacticalCommsBar_RendersRadioReplyActiveChipsAndExecutes1ClickCallouts',
+      'TacticalCommsBar_RendersReplyOverrideAndMarkerChipsAndSendsMarker',
       (tester) async {
         final sentCommands = <String>[];
         final clearedKeys = <String>[];
 
         const insights = TacticalInsights(
           teamDamageProfile: TeamDamageProfile(adPercent: 50, apPercent: 50),
-          enemyCooldowns: EnemyCooldowns(
-            championName: 'Ahri',
-            level: 8,
-            abilityHaste: 10,
-            q: 6,
-            w: 8,
-            e: 11,
-            r: 95,
-            keyThreatSummary: 'Punish Ahri E (11s CD) after cast!',
-          ),
           liveOverrides: LiveTacticalOverrides(
             laneOpponentOverride: 'Vayne',
             campedStatus: 'camped',
             enemyBuildOverrides: {'KaiSa': 'ap'},
           ),
+          reviewMarkers: [
+            ReviewMarker(id: 'm_1', gameTime: 425, note: 'bad trade'),
+          ],
           lastCoachExchange: CoachExchange(
             id: 'cmd_1',
             userText: 'Vayne ist Top und ich werde gecampt',
@@ -315,19 +267,26 @@ void main() {
           ),
         );
 
-        expect(find.text('RACE ENGINEER RADIO'), findsOneWidget);
+        expect(find.text('COACH'), findsOneWidget);
         expect(
           find.text('Anti-Camp aktiv: Freeze vor eigenem Turm gegen Vayne.'),
           findsOneWidget,
         );
         expect(find.text('🔄 Lane vs Vayne'), findsOneWidget);
 
-        // 1-Click on Quick Callout Pill ("Vayne Flash") sends command
-        await tester.tap(find.text('Vayne Flash'));
+        // The marker pill sends the marker command; no enemy spell callouts exist
+        await tester.tap(find.text('Marker'));
         await tester.pump();
-        expect(sentCommands, contains('Vayne Flash'));
+        expect(sentCommands, contains('Marker'));
         expect(find.text('[F1]'), findsOneWidget);
-        expect(find.text('[F2]'), findsOneWidget);
+        expect(find.text('[F2]'), findsNothing);
+        expect(find.textContaining('Flash'), findsNothing);
+
+        // 1-Click on a review marker chip removes that marker
+        expect(find.text('📍 7:05 bad trade'), findsOneWidget);
+        await tester.tap(find.text('📍 7:05 bad trade'));
+        await tester.pump();
+        expect(clearedKeys, contains('marker:m_1'));
 
         // 1-Click on Active Override Chip removes override
         await tester.tap(find.text('🔄 Lane vs Vayne'));

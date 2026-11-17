@@ -83,8 +83,8 @@ export class LiveClientPoller {
 
   start() {
     Logger.info("[Poller] Started — waiting for active game...");
-    this.poll();
-    this.intervalId = setInterval(() => this.poll(), POLL_INTERVAL_MS);
+    void this.poll();
+    this.intervalId = setInterval(() => void this.poll(), POLL_INTERVAL_MS);
   }
 
   stop() {

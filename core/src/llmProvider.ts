@@ -35,10 +35,8 @@ const LlmResponseSchema = z.object({
   strategy: z.object({
     winCondition: z.enum(["early", "mid", "late"]).optional(),
     summary: z.string().optional(),
-    immediateAction: z.string().optional(),
     lateGamePlan: z.string().optional(),
     laneMatchupAnalysis: z.string().optional(),
-    counterPlay: z.string().optional(),
   }).optional()
 });
 
@@ -75,7 +73,6 @@ export type ProviderType = "claude" | "openai" | "gemini";
 const DEFAULT_STRATEGY: Strategy = {
   winCondition: "mid",
   summary: "",
-  immediateAction: "",
   lateGamePlan: "",
 };
 
@@ -109,10 +106,8 @@ export function parseAnalysisResponse(raw: string): LlmAnalysis {
       strategy: {
         winCondition: data.strategy?.winCondition ?? DEFAULT_STRATEGY.winCondition,
         summary: data.strategy?.summary ?? DEFAULT_STRATEGY.summary,
-        immediateAction: data.strategy?.immediateAction ?? DEFAULT_STRATEGY.immediateAction,
         lateGamePlan: data.strategy?.lateGamePlan ?? DEFAULT_STRATEGY.lateGamePlan,
         laneMatchupAnalysis: data.strategy?.laneMatchupAnalysis,
-        counterPlay: data.strategy?.counterPlay,
       },
     };
   } catch (err) {

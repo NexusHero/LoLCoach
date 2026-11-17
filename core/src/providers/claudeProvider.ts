@@ -46,9 +46,9 @@ export class ClaudeProvider implements LlmProvider {
         ],
       });
 
-      if (response.content.length === 0) return { reasoning: "", strategy: { winCondition: "mid", summary: "", immediateAction: "", lateGamePlan: "" } };
+      if (response.content.length === 0) return { reasoning: "", strategy: { winCondition: "mid", summary: "", lateGamePlan: "" } };
       const block = response.content[0];
-      if (block.type !== "text") return { reasoning: "", strategy: { winCondition: "mid", summary: "", immediateAction: "", lateGamePlan: "" } };
+      if (block.type !== "text") return { reasoning: "", strategy: { winCondition: "mid", summary: "", lateGamePlan: "" } };
 
       const cacheHit = (response.usage as unknown as Record<string, unknown>).cache_read_input_tokens as number ?? 0;
       const tokenUsage: TokenUsage = {

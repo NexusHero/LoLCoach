@@ -291,6 +291,30 @@ class PostGameAutopsyCard extends StatelessWidget {
               ],
             ),
           ],
+          for (final marker in autopsy.reviewMarkers) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.bookmark_outline_rounded,
+                  size: 16,
+                  color: colors.cyan,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    marker.note.isEmpty
+                        ? 'Marker ${marker.clock}'
+                        : '${marker.clock} — ${marker.note}',
+                    style: AppTextStyles.caption.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

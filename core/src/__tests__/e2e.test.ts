@@ -165,7 +165,7 @@ describe("System: Full Bridge Wiring (e2e)", () => {
     };
     const getAnalysis = jest.fn().mockResolvedValue({
       reasoning: "",
-      strategy: { winCondition: "mid", summary: "", immediateAction: "", lateGamePlan: "" },
+      strategy: { winCondition: "mid", summary: "", lateGamePlan: "" },
     });
     createLlmProvider.mockResolvedValue({ name: "mock-provider", getAnalysis });
 

@@ -67,8 +67,6 @@ class StrategyLinesBlock extends StatelessWidget {
           strategy.laneMatchupAnalysis!,
           Icons.compare_arrows_rounded,
         ),
-      if (strategy.counterPlay != null)
-        ('Counter', strategy.counterPlay!, Icons.shield_outlined),
     ];
     return Column(
       children: [

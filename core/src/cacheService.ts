@@ -46,12 +46,18 @@ export class CacheService {
     // Deaths are exact (not bucketed): each death changes the live situation
     // meaningfully, so consecutive deaths must not collapse into one cache entry.
     const deaths = state.localPlayer.scores.deaths;
-    const enemyNames = state.enemies.map((e) => e.championName).sort().join(",");
+    const enemyNames = state.enemies
+      .map((e) => e.championName)
+      .sort((a, b) => a.localeCompare(b))
+      .join(",");
     const enemyCoreItems = state.enemies
       .flatMap((e) => e.items.filter((i) => i.price >= 2400).map((i) => i.itemID))
-      .sort()
+      .sort((a, b) => a - b)
       .join(",");
-    const myItems = state.localPlayer.items.map((i) => i.itemID).sort().join(",");
+    const myItems = state.localPlayer.items
+      .map((i) => i.itemID)
+      .sort((a, b) => a - b)
+      .join(",");
     return [
       state.localPlayer.championName,
       phase,

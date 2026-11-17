@@ -4,7 +4,6 @@ import 'package:lol_coach/models/tactical_insights.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/badge.dart';
-import 'package:lol_coach/widgets/common/interactive_cooldown_bar.dart';
 import 'package:lol_coach/widgets/common/item_slot.dart';
 
 /// The headline item, rendered in a tinted rounded row with a subtle glow.
@@ -179,7 +178,7 @@ class NextBestBuyBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'BUY NOW: ${buy.itemName.toUpperCase()} (${buy.price}g)',
+                  'NEXT BUY: ${buy.itemName.toUpperCase()} (${buy.price}g)',
                   style: AppTextStyles.micro.copyWith(
                     color: colors.gold,
                     fontWeight: FontWeight.w800,
@@ -197,64 +196,6 @@ class NextBestBuyBanner extends StatelessWidget {
                 ],
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Key-Threat-Diff + Interactive 1-Click Q/W/E/R & Summoner Cooldown Bar.
-class EnemyCooldownsStrip extends StatelessWidget {
-  const EnemyCooldownsStrip({
-    required this.cooldowns,
-    super.key,
-    this.activeTimers = const [],
-  });
-
-  final EnemyCooldowns cooldowns;
-  final List<ActiveSpellTimer> activeTimers;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: colors.surface2,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.hairlineSoft),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.bolt_outlined, size: 14, color: colors.cyan),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  cooldowns.keyThreatSummary,
-                  style: AppTextStyles.caption.copyWith(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Text(
-                '${cooldowns.championName} · 1-CLICK CD',
-                style: AppTextStyles.micro.copyWith(
-                  color: colors.textDisabled,
-                  fontSize: 9,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          InteractiveCooldownGrid(
-            cooldowns: cooldowns,
-            compact: true,
-            activeTimers: activeTimers,
           ),
         ],
       ),

@@ -27,7 +27,7 @@ jobs:
           cache-dependency-path: core/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts && npm run postinstall
         working-directory: core
 
       - name: Bundle with webpack

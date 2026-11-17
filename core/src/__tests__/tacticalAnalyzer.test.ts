@@ -2,7 +2,6 @@ import {
   computePrimaryThreat,
   computeTeamDamageProfile,
   computeNextBestBuy,
-  computeEnemyCooldowns,
 } from "../tacticalAnalyzer";
 import { makeGameState, makePlayer, makeItem, makeActivePlayer } from "./fixtures";
 
@@ -195,48 +194,6 @@ describe("tacticalAnalyzer", () => {
       expect(nextBuy).toBeDefined();
       expect(nextBuy?.itemId).toBe(3190);
       expect(nextBuy?.itemName).toBe("Locket of the Iron Solari");
-    });
-  });
-
-  describe("computeEnemyCooldowns", () => {
-    it("computeEnemyCooldowns_LaneOpponentWithSummonersAndHaste_ComputesQWERKeySpellAndSummonerCds", async () => {
-      const state = makeGameState({
-        gameTime: 720,
-        localPlayer: makePlayer({ championName: "Ezreal", position: "BOTTOM", level: 9 }),
-        enemies: [
-          makePlayer({
-            championName: "Blitzcrank",
-            position: "BOTTOM",
-            team: "CHAOS",
-            level: 9,
-            items: [
-              makeItem({ itemID: 3158, displayName: "Ionian Boots of Lucidity", price: 900 }),
-              makeItem({ itemID: 3190, displayName: "Locket of the Iron Solari", price: 2200 }),
-            ],
-            runes: {
-              keystone: { displayName: "Glacial Augment" },
-              primaryRuneTree: { displayName: "Inspiration" },
-              secondaryRuneTree: { displayName: "Resolve" },
-            },
-            summonerSpells: {
-              summonerSpellOne: { displayName: "Flash" },
-              summonerSpellTwo: { displayName: "Ignite" },
-            },
-          }),
-        ],
-      });
-
-      const cds = await computeEnemyCooldowns(state);
-
-      expect(cds).toBeDefined();
-      expect(cds?.championName).toBe("Blitzcrank");
-      expect(cds?.abilityHaste).toBe(25); // 15 (Ionian) + 10 (Locket)
-      expect(cds?.keyThreatSpell).toBe("Q");
-      expect(cds?.keyThreatSummary).toContain("Q");
-      // Summoner haste: +10 (Ionian) + 18 (Inspiration) = 28 -> Flash 300 * 100/128 = 234s
-      expect(cds?.summonerSpells).toHaveLength(2);
-      expect(cds?.summonerSpells?.[0]).toEqual({ name: "Flash", cooldown: 234 });
-      expect(cds?.summonerSpells?.[1]).toEqual({ name: "Ignite", cooldown: 141 });
     });
   });
 });

@@ -30,65 +30,6 @@ class NextBestBuy {
   final String? breakpointHint;
 }
 
-class EnemySummonerCooldown {
-  const EnemySummonerCooldown({
-    required this.name,
-    required this.cooldown,
-  });
-
-  factory EnemySummonerCooldown.fromJson(Map<String, dynamic> json) =>
-      EnemySummonerCooldown(
-        name: json['name'] as String? ?? '',
-        cooldown: (json['cooldown'] as num?)?.toInt() ?? 0,
-      );
-
-  final String name;
-  final int cooldown;
-}
-
-class EnemyCooldowns {
-  const EnemyCooldowns({
-    required this.championName,
-    required this.level,
-    required this.abilityHaste,
-    required this.q,
-    required this.w,
-    required this.e,
-    required this.r,
-    required this.keyThreatSummary,
-    this.keyThreatSpell,
-    this.summonerSpells = const [],
-  });
-
-  factory EnemyCooldowns.fromJson(Map<String, dynamic> json) => EnemyCooldowns(
-        championName: json['championName'] as String? ?? '',
-        level: (json['level'] as num?)?.toInt() ?? 1,
-        abilityHaste: (json['abilityHaste'] as num?)?.toInt() ?? 0,
-        q: (json['q'] as num?)?.toInt() ?? 0,
-        w: (json['w'] as num?)?.toInt() ?? 0,
-        e: (json['e'] as num?)?.toInt() ?? 0,
-        r: (json['r'] as num?)?.toInt() ?? 0,
-        keyThreatSpell: json['keyThreatSpell'] as String?,
-        summonerSpells: (json['summonerSpells'] as List<dynamic>? ?? const [])
-            .map(
-              (e) => EnemySummonerCooldown.fromJson(e as Map<String, dynamic>),
-            )
-            .toList(),
-        keyThreatSummary: json['keyThreatSummary'] as String? ?? '',
-      );
-
-  final String championName;
-  final int level;
-  final int abilityHaste;
-  final int q;
-  final int w;
-  final int e;
-  final int r;
-  final String? keyThreatSpell;
-  final List<EnemySummonerCooldown> summonerSpells;
-  final String keyThreatSummary;
-}
-
 class MacroAlert {
   const MacroAlert({
     required this.id,
@@ -188,7 +129,6 @@ class TacticalInsights {
     required this.teamDamageProfile,
     this.primaryThreat,
     this.nextBestBuy,
-    this.enemyCooldowns,
     this.macroAlerts = const [],
     this.objectives = const [],
     this.csPerMin = 0,
@@ -196,6 +136,7 @@ class TacticalInsights {
     this.buildFocus = 'auto',
     this.preferPassiveItems = false,
     this.liveOverrides,
+    this.reviewMarkers = const [],
     this.lastCoachExchange,
   });
 
@@ -214,11 +155,6 @@ class TacticalInsights {
         nextBestBuy: json['nextBestBuy'] != null
             ? NextBestBuy.fromJson(json['nextBestBuy'] as Map<String, dynamic>)
             : null,
-        enemyCooldowns: json['enemyCooldowns'] != null
-            ? EnemyCooldowns.fromJson(
-                json['enemyCooldowns'] as Map<String, dynamic>,
-              )
-            : null,
         macroAlerts: (json['macroAlerts'] as List<dynamic>? ?? const [])
             .map((e) => MacroAlert.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -234,6 +170,7 @@ class TacticalInsights {
                 json['liveOverrides'] as Map<String, dynamic>,
               )
             : null,
+        reviewMarkers: ReviewMarker.listFromJson(json['reviewMarkers']),
         lastCoachExchange: json['lastCoachExchange'] != null
             ? CoachExchange.fromJson(
                 json['lastCoachExchange'] as Map<String, dynamic>,
@@ -244,7 +181,6 @@ class TacticalInsights {
   final PrimaryThreat? primaryThreat;
   final TeamDamageProfile teamDamageProfile;
   final NextBestBuy? nextBestBuy;
-  final EnemyCooldowns? enemyCooldowns;
   final List<MacroAlert> macroAlerts;
   final List<ObjectiveTimer> objectives;
   final double csPerMin;
@@ -252,6 +188,7 @@ class TacticalInsights {
   final String buildFocus;
   final bool preferPassiveItems;
   final LiveTacticalOverrides? liveOverrides;
+  final List<ReviewMarker> reviewMarkers;
   final CoachExchange? lastCoachExchange;
 }
 
@@ -266,6 +203,7 @@ class PostGameAutopsy {
     required this.praise,
     required this.mistakes,
     required this.timestamp,
+    this.reviewMarkers = const [],
   });
 
   factory PostGameAutopsy.fromJson(Map<String, dynamic> json) =>
@@ -281,6 +219,7 @@ class PostGameAutopsy {
             .map((e) => e.toString())
             .toList(),
         timestamp: (json['timestamp'] as num?)?.toInt() ?? 0,
+        reviewMarkers: ReviewMarker.listFromJson(json['reviewMarkers']),
       );
 
   final String championName;
@@ -292,6 +231,7 @@ class PostGameAutopsy {
   final String praise;
   final List<String> mistakes;
   final int timestamp;
+  final List<ReviewMarker> reviewMarkers;
 }
 
 class PlayerHabitProfile {

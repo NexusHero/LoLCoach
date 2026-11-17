@@ -2,211 +2,167 @@ import type {
   ParsedGameState,
   ObjectiveTimer,
   MacroAlert,
+  LiveGameEvent,
 } from "./types.js";
 
+// Objective timings as of patch 26.1 (verified against patch 26.22).
 const DRAGON_FIRST_SPAWN_SEC = 300; // 5:00
 const DRAGON_RESPAWN_SEC = 300; // 5:00
-const GRUBS_SPAWN_SEC = 360; // 6:00
-const GRUBS_DESPAWN_SEC = 825; // 13:45
-const HERALD_SPAWN_SEC = 840; // 14:00
+const DRAGONS_FOR_SOUL = 4;
+const ELDER_RESPAWN_SEC = 360; // 6:00 after soul / previous Elder
+const GRUBS_SPAWN_SEC = 480; // 8:00
+const GRUBS_DESPAWN_SEC = 885; // 14:45
+const GRUBS_COUNT = 3; // single camp of three, no respawn
+const HERALD_SPAWN_SEC = 900; // 15:00
 const HERALD_DESPAWN_SEC = 1185; // 19:45
 const BARON_FIRST_SPAWN_SEC = 1200; // 20:00
 const BARON_RESPAWN_SEC = 360; // 6:00
+const BARON_VISIBLE_FROM_SEC = 1080; // show the countdown from 18:00
+
+const SPAWNING_SOON_SEC = 75;
+const ALERT_WINDOW_MIN_SEC = 35;
+const GOLD_ALERT_MIN = 1400;
+const GOLD_ALERT_IMMEDIATE = 1800;
+const GOLD_HOARDING_SEC = 30;
+const MAX_ALERTS = 2;
+
+type Team = "ORDER" | "CHAOS";
+
+function timerStatus(secondsUntilSpawn: number): ObjectiveTimer["status"] {
+  if (secondsUntilSpawn === 0) return "alive";
+  return secondsUntilSpawn <= SPAWNING_SOON_SEC ? "spawning_soon" : "countdown";
+}
+
+function makeTimer(
+  type: ObjectiveTimer["type"],
+  label: string,
+  spawnAtSec: number,
+  gameTime: number,
+): ObjectiveTimer {
+  const secondsUntilSpawn = Math.max(0, Math.floor(spawnAtSec - gameTime));
+  return { type, label, secondsUntilSpawn, status: timerStatus(secondsUntilSpawn) };
+}
+
+function latestEvent(events: LiveGameEvent[]): LiveGameEvent | undefined {
+  return events.reduce<LiveGameEvent | undefined>(
+    (latest, e) => (!latest || e.EventTime > latest.EventTime ? e : latest),
+    undefined,
+  );
+}
+
+/** Live events carry the game name only; player entries may carry "Name#TAG". */
+function baseName(name: string): string {
+  return name.split("#")[0].trim().toLowerCase();
+}
+
+function buildTeamLookup(state: ParsedGameState): Map<string, Team> {
+  const lookup = new Map<string, Team>();
+  for (const p of [state.localPlayer, ...state.allies, ...state.enemies]) {
+    lookup.set(baseName(p.summonerName), p.team);
+  }
+  return lookup;
+}
+
+function isElderKill(e: LiveGameEvent): boolean {
+  return (e.DragonType ?? "").toLowerCase() === "elder";
+}
+
+/**
+ * True once one team holds the Dragon Soul. Kills whose killer cannot be
+ * mapped to a team are ignored, except that seven elemental kills always
+ * imply a soul (one team must hold four).
+ */
+function isSoulTaken(elementalKills: LiveGameEvent[], teams: Map<string, Team>): boolean {
+  if (elementalKills.length >= DRAGONS_FOR_SOUL * 2 - 1) return true;
+  const counts: Record<Team, number> = { ORDER: 0, CHAOS: 0 };
+  for (const kill of elementalKills) {
+    const team = kill.KillerName ? teams.get(baseName(kill.KillerName)) : undefined;
+    if (team) counts[team] += 1;
+  }
+  return counts.ORDER >= DRAGONS_FOR_SOUL || counts.CHAOS >= DRAGONS_FOR_SOUL;
+}
+
+function computeDragonTimer(state: ParsedGameState, events: LiveGameEvent[]): ObjectiveTimer {
+  const t = state.gameTime;
+  const dragonKills = events.filter((e) => e.EventName === "DragonKill");
+  const lastKill = latestEvent(dragonKills);
+  const elementalKills = dragonKills.filter((e) => !isElderKill(e));
+
+  if (lastKill && isSoulTaken(elementalKills, buildTeamLookup(state))) {
+    return makeTimer("elder", "Elder Dragon", lastKill.EventTime + ELDER_RESPAWN_SEC, t);
+  }
+  const spawnAt = lastKill ? lastKill.EventTime + DRAGON_RESPAWN_SEC : DRAGON_FIRST_SPAWN_SEC;
+  return makeTimer("dragon", "Dragon", spawnAt, t);
+}
+
+/** Top-side pit before Baron: Voidgrubs until 14:45, then Rift Herald until 19:45. */
+function computeVoidPitTimer(t: number, events: LiveGameEvent[]): ObjectiveTimer | undefined {
+  const grubKills = events.filter((e) => e.EventName === "HordeKill").length;
+  if (t < GRUBS_DESPAWN_SEC && grubKills < GRUBS_COUNT) {
+    return makeTimer("grubs", "Voidgrubs", GRUBS_SPAWN_SEC, t);
+  }
+  const heraldKilled = events.some((e) => e.EventName === "HeraldKill");
+  if (t < HERALD_DESPAWN_SEC && !heraldKilled) {
+    return makeTimer("herald", "Rift Herald", HERALD_SPAWN_SEC, t);
+  }
+  return undefined;
+}
+
+function computeBaronTimer(t: number, events: LiveGameEvent[]): ObjectiveTimer | undefined {
+  if (t < BARON_VISIBLE_FROM_SEC) return undefined;
+  const lastKill = latestEvent(events.filter((e) => e.EventName === "BaronKill"));
+  const spawnAt = lastKill ? lastKill.EventTime + BARON_RESPAWN_SEC : BARON_FIRST_SPAWN_SEC;
+  return makeTimer("baron", "Baron", spawnAt, t);
+}
 
 export function computeObjectives(state: ParsedGameState): ObjectiveTimer[] {
   const t = state.gameTime;
   const events = state.mapEvents ?? [];
-  const timers: ObjectiveTimer[] = [];
-
-  // 1. Dragon timer
-  const dragonKills = events
-    .filter((e) => e.EventName === "DragonKill")
-    .sort((a, b) => b.EventTime - a.EventTime);
-
-  let nextDragonSec = DRAGON_FIRST_SPAWN_SEC;
-  if (dragonKills.length > 0) {
-    nextDragonSec = Math.floor(dragonKills[0].EventTime + DRAGON_RESPAWN_SEC);
-  } else if (t >= DRAGON_FIRST_SPAWN_SEC) {
-    nextDragonSec = t; // Alive on map
-  }
-
-  const dragonCountdown = Math.max(0, nextDragonSec - t);
-  timers.push({
-    type: "dragon",
-    label: "Dragon",
-    secondsUntilSpawn: dragonCountdown,
-    status:
-      dragonCountdown === 0
-        ? "alive"
-        : dragonCountdown <= 75
-          ? "spawning_soon"
-          : "countdown",
-  });
-
-  // 2. Top-side pit: Grubs (<13:45) -> Herald (14:00-19:45) -> Baron (>=20:00)
-  if (t < GRUBS_DESPAWN_SEC) {
-    const grubKills = events.filter((e) => e.EventName === "HordeKill");
-    if (grubKills.length < 6) {
-      const grubCountdown = Math.max(0, GRUBS_SPAWN_SEC - t);
-      timers.push({
-        type: "grubs",
-        label: "Voidgrubs",
-        secondsUntilSpawn: grubCountdown,
-        status:
-          grubCountdown === 0
-            ? "alive"
-            : grubCountdown <= 75
-              ? "spawning_soon"
-              : "countdown",
-      });
-    }
-  } else if (t < HERALD_DESPAWN_SEC) {
-    const heraldKilled = events.some((e) => e.EventName === "HeraldKill");
-    if (!heraldKilled) {
-      const heraldCountdown = Math.max(0, HERALD_SPAWN_SEC - t);
-      timers.push({
-        type: "herald",
-        label: "Rift Herald",
-        secondsUntilSpawn: heraldCountdown,
-        status:
-          heraldCountdown === 0
-            ? "alive"
-            : heraldCountdown <= 75
-              ? "spawning_soon"
-              : "countdown",
-      });
-    }
-  }
-
-  // Always show Baron countdown from 18:00 onwards
-  if (t >= 1080) {
-    const baronKills = events
-      .filter((e) => e.EventName === "BaronKill")
-      .sort((a, b) => b.EventTime - a.EventTime);
-
-    let nextBaronSec = BARON_FIRST_SPAWN_SEC;
-    if (baronKills.length > 0) {
-      nextBaronSec = Math.floor(baronKills[0].EventTime + BARON_RESPAWN_SEC);
-    } else if (t >= BARON_FIRST_SPAWN_SEC) {
-      nextBaronSec = t;
-    }
-
-    const baronCountdown = Math.max(0, nextBaronSec - t);
-    timers.push({
-      type: "baron",
-      label: "Baron",
-      secondsUntilSpawn: baronCountdown,
-      status:
-        baronCountdown === 0
-          ? "alive"
-          : baronCountdown <= 75
-            ? "spawning_soon"
-            : "countdown",
-    });
-  }
-
-  return timers;
+  const timers: Array<ObjectiveTimer | undefined> = [
+    computeDragonTimer(state, events),
+    computeVoidPitTimer(t, events),
+    computeBaronTimer(t, events),
+  ];
+  return timers.filter((timer): timer is ObjectiveTimer => timer !== undefined);
 }
 
 /**
- * Priority-Capped Banner — strictly returns at most 2 simultaneous MacroAlerts:
- * 1. Danger (Early Jungle Gank 2:55–3:45 OR Shutdown Bounty Protection)
- * 2. Objective T-60s Reset Window
- * 3. Economy (Gold Hoarding >= 1400g)
+ * Informational banner, capped at two entries. It only surfaces facts the
+ * game client itself shows (objective spawn countdown, own unspent gold) and
+ * never tells the player what to do — Riot's third-party policy forbids tools
+ * that dictate decisions or raise power-spike / gank alarms.
  */
 export function computeMacroAlerts(
   state: ParsedGameState,
   objectives: ObjectiveTimer[],
   goldHoardingSeconds = 0,
-  campedStatus: "normal" | "camped" | "weaksided" = "normal",
 ): MacroAlert[] {
   const alerts: MacroAlert[] = [];
-  const t = state.gameTime;
-  const me = state.localPlayer;
   const gold = Math.floor(state.activePlayer.currentGold);
 
-  // Priority 1A: Early Jungle Clear Gank Window (2:55 - 3:45)
-  if (t >= 175 && t <= 225 && me.position !== "JUNGLE" && !me.isDead) {
-    const enemyJg = state.enemies.find((e) => e.position === "JUNGLE");
-    const jgName = enemyJg?.championName ?? "Enemy Jungler";
-    alerts.push({
-      id: "jungle_gank_window",
-      priority: "critical",
-      category: "danger",
-      title: `GANK WINDOW (3:00–3:40): ${jgName.toUpperCase()}`,
-      detail: `${jgName} finished 6-camp clear — ward river & hug safe side`,
-    });
-  }
-
-  // Priority 1B: Shutdown Bounty Protection
-  const netKills = me.scores.kills - me.scores.deaths;
-  if (!me.isDead && (netKills >= 3 || (me.scores.kills >= 4 && me.scores.deaths <= 1))) {
-    alerts.push({
-      id: "shutdown_protection",
-      priority: "critical",
-      category: "danger",
-      title: `PROTECT SHUTDOWN (${me.scores.kills}/${me.scores.deaths}/${me.scores.assists})`,
-      detail: "High bounty on your head — avoid blind 1v2s and play on vision",
-    });
-  }
-
-  // Priority 1C: Active Camped / Weakside Override from Voice/Chat Coach
-  if (!me.isDead && (campedStatus === "camped" || campedStatus === "weaksided")) {
-    alerts.push({
-      id: "camped_protocol",
-      priority: "critical",
-      category: "danger",
-      title: campedStatus === "camped" ? "CAMPED PROTOCOL ACTIVE" : "WEAKSIDE PROTOCOL ACTIVE",
-      detail: "Freeze near tower, hold escape spell & buy defensive stats first",
-    });
-  }
-
-  // Priority 1D: Level 6 Ultimate Spike Disadvantage vs Lane Opponent
-  if (!me.isDead && me.position && me.position !== "UNKNOWN" && me.position !== "JUNGLE") {
-    const laneOpp = state.enemies.find((e) => e.position === me.position && !e.isDead);
-    if (laneOpp && laneOpp.level >= 6 && me.level === 5) {
-      alerts.push({
-        id: "level_6_disadvantage",
-        priority: "critical",
-        category: "danger",
-        title: `LVL 6 DANGER: ${laneOpp.championName.toUpperCase()} HAS R (YOU: LVL 5)`,
-        detail: `Respect ${laneOpp.championName} ultimate all-in — concede wave until you hit Level 6`,
-      });
-    }
-  }
-
-  // Priority 2: Objective T-60s Setup / Reset Window
-  const upcomingObj = objectives.find(
-    (o) => o.secondsUntilSpawn >= 35 && o.secondsUntilSpawn <= 75,
+  const upcoming = objectives.find(
+    (o) => o.secondsUntilSpawn >= ALERT_WINDOW_MIN_SEC && o.secondsUntilSpawn <= SPAWNING_SOON_SEC,
   );
-  if (upcomingObj) {
+  if (upcoming) {
     alerts.push({
-      id: `obj_setup_${upcomingObj.type}`,
+      id: `obj_spawn_${upcoming.type}`,
       priority: "warning",
       category: "objective",
-      title: `${upcomingObj.label.toUpperCase()} IN ${upcomingObj.secondsUntilSpawn}s — RESET NOW`,
-      detail: `Push wave & recall (${gold}g in pocket) to arrive 30s early for vision`,
+      title: `${upcoming.label.toUpperCase()} IN ${upcoming.secondsUntilSpawn}s`,
+      detail: `Spawns soon — you hold ${gold}g`,
     });
   }
 
-  // Priority 3: Gold Hoarding Warning
-  if (!me.isDead && gold >= 1400 && (goldHoardingSeconds >= 30 || gold >= 1800)) {
+  const hoarding = goldHoardingSeconds >= GOLD_HOARDING_SEC || gold >= GOLD_ALERT_IMMEDIATE;
+  if (!state.localPlayer.isDead && gold >= GOLD_ALERT_MIN && hoarding) {
     alerts.push({
       id: "gold_hoarding",
       priority: "info",
       category: "economy",
-      title: `UNSPENT GOLD SPIKE: ${gold}g`,
-      detail: "Sitting on unspent combat stats — crash next wave and recall",
+      title: `UNSPENT GOLD: ${gold}g`,
+      detail: "Enough gold for your next item component",
     });
   }
 
-  return alerts.slice(0, 2);
-}
-
-export function findObjectiveSetupTrigger(
-  objectives: ObjectiveTimer[],
-): ObjectiveTimer | undefined {
-  return objectives.find(
-    (o) => o.secondsUntilSpawn >= 50 && o.secondsUntilSpawn <= 68,
-  );
+  return alerts.slice(0, MAX_ALERTS);
 }

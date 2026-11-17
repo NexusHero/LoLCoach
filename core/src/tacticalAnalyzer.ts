@@ -1,22 +1,12 @@
-import type {
-  ParsedGameState,
-  Player,
-  EnemyCooldowns,
-  EnemySummonerCooldown,
-  RolePosition,
-} from "./types.js";
+import type { ParsedGameState, Player, RolePosition } from "./types.js";
 import { ddragon } from "./ddragonService.js";
 import {
-  type SkillSlot,
   FALLBACK_ITEM_DAMAGE_STATS,
   HEALING_CHAMPIONS,
   HEALING_ITEM_IDS,
   ARMOR_ITEM_IDS,
   MR_ITEM_IDS,
-  ITEM_ABILITY_HASTE,
   PASSIVE_ITEM_ALTERNATIVES,
-  getChampionTacticalMeta,
-  computeSummonerSpellCooldown,
 } from "./tacticalCatalog.js";
 
 export { PASSIVE_ITEM_ALTERNATIVES };
@@ -178,118 +168,5 @@ export function computeTeamDamageProfile(
     heavyHealing: healers >= 2,
     armorStacking: armorBuilders >= 2,
     mrStacking: mrBuilders >= 2,
-  };
-}
-
-function computeSkillRanks(
-  lvl: number,
-  maxOrder: [SkillSlot, SkillSlot, SkillSlot],
-): Record<SkillSlot, number> {
-  const firstRank = Math.min(5, Math.ceil(lvl / 2));
-  const secondRank = lvl >= 4 ? Math.min(5, Math.max(1, lvl - 7)) : 1;
-  const thirdRank = lvl >= 3 ? Math.min(5, Math.max(1, lvl - 12)) : 1;
-  return {
-    [maxOrder[0]]: firstRank,
-    [maxOrder[1]]: secondRank,
-    [maxOrder[2]]: thirdRank,
-  } as Record<SkillSlot, number>;
-}
-
-function computeOpponentSummonerSpells(
-  opp: Player,
-  gameTimeSec: number,
-): EnemySummonerCooldown[] {
-  let summonerHaste = 0;
-  if (opp.items.some((i) => i.itemID === 3158)) summonerHaste += 10; // Ionian Boots
-  const primaryTree = opp.runes?.primaryRuneTree?.displayName ?? "";
-  const secondaryTree = opp.runes?.secondaryRuneTree?.displayName ?? "";
-  if (primaryTree.includes("Inspiration") || secondaryTree.includes("Inspiration")) {
-    summonerHaste += 18; // Cosmic Insight
-  }
-
-  const rawSpells = [
-    opp.summonerSpells?.summonerSpellOne?.displayName,
-    opp.summonerSpells?.summonerSpellTwo?.displayName,
-  ].filter((s): s is string => !!s && s.trim().length > 0);
-
-  const result: EnemySummonerCooldown[] = [];
-  for (const name of rawSpells) {
-    const parsed = computeSummonerSpellCooldown(name, opp.level, gameTimeSec, summonerHaste);
-    if (parsed) result.push(parsed);
-  }
-  return result;
-}
-
-/**
- * Computes opponent Q/W/E/R + Summoner Spell cooldowns using champion-specific
- * skill-maxing curves, DDragon Ability Haste, and Key-Threat vs Escape spell diff.
- */
-export async function computeEnemyCooldowns(
-  state: ParsedGameState,
-  laneOpponentOverride?: string,
-): Promise<EnemyCooldowns | undefined> {
-  const myPos = (state.localPlayer.position || "UNKNOWN") as RolePosition;
-  const opp = findLaneOpponent(state, myPos, laneOpponentOverride);
-  if (!opp) return undefined;
-
-  const oppAbilities = await ddragon.getChampionAbilities(opp.championName);
-  const myAbilities = await ddragon.getChampionAbilities(state.localPlayer.championName);
-
-  const oppMeta = getChampionTacticalMeta(opp.championName, oppAbilities);
-  const myMeta = getChampionTacticalMeta(state.localPlayer.championName, myAbilities);
-
-  const oppAh = opp.items.reduce((sum, i) => {
-    const ddAh = ddragon.getItemInfo(i.itemID)?.numericStats?.abilityHaste;
-    const ah = ddAh && ddAh > 0 ? ddAh : (ITEM_ABILITY_HASTE[i.itemID] ?? 0);
-    return sum + ah * Math.max(1, i.count);
-  }, 0);
-
-  const lvl = Math.max(1, Math.min(18, opp.level));
-  const ranks = computeSkillRanks(lvl, oppMeta.maxOrder);
-  const rRank = lvl >= 16 ? 3 : lvl >= 11 ? 2 : 1;
-
-  const pickCd = (arr: number[] | undefined, rank: number, fallback: number): number => {
-    const base = arr && arr.length > 0 ? (arr[Math.min(arr.length - 1, rank - 1)] ?? fallback) : fallback;
-    return Math.max(1, Math.round(base * (100 / (100 + oppAh))));
-  };
-
-  const q = pickCd(oppAbilities?.qCooldown, ranks.Q, 7);
-  const w = pickCd(oppAbilities?.wCooldown, ranks.W, 13);
-  const e = pickCd(oppAbilities?.eCooldown, ranks.E, 15);
-  const r = pickCd(oppAbilities?.rCooldown, rRank, 100);
-  const cdBySlot: Record<SkillSlot, number> = { Q: q, W: w, E: e };
-
-  const myEscapeSlot = myMeta.escapeSpell;
-  const myAh = state.activePlayer.championStats.abilityHaste ?? 0;
-  const myEscapeLevel = state.activePlayer.abilities?.[myEscapeSlot]?.abilityLevel || 1;
-  const myEscapeArr =
-    myEscapeSlot === "Q"
-      ? myAbilities?.qCooldown
-      : myEscapeSlot === "E"
-        ? myAbilities?.eCooldown
-        : myAbilities?.wCooldown;
-  const myEscapeBase = myEscapeArr?.[Math.max(0, myEscapeLevel - 1)] ?? 15;
-  const myEscapeCd = Math.max(1, Math.round(myEscapeBase * (100 / (100 + myAh))));
-
-  const keySkill = oppMeta.keyThreatSpell;
-  const keyCd = cdBySlot[keySkill];
-  const keyThreatSummary =
-    myEscapeCd > keyCd
-      ? `His ${keySkill} (${keyCd}s) vs your ${myEscapeSlot} (${myEscapeCd}s) -> ${myEscapeCd - keyCd}s vulnerable!`
-      : `Punish ${opp.championName} ${keySkill} (${keyCd}s CD) after cast!`;
-
-  const summonerSpells = computeOpponentSummonerSpells(opp, state.gameTime);
-
-  return {
-    championName: opp.championName,
-    level: opp.level,
-    abilityHaste: oppAh,
-    q,
-    w,
-    e,
-    r,
-    keyThreatSpell: keySkill,
-    ...(summonerSpells.length > 0 ? { summonerSpells } : {}),
-    keyThreatSummary,
   };
 }

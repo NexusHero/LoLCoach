@@ -48,28 +48,23 @@ export function buildHeuristicStrategy(
   const winCondition: Strategy["winCondition"] = isAhead ? "early" : isApChamp ? "late" : "mid";
 
   let summary: string;
-  let immediateAction: string;
   let lateGamePlan: string;
 
   if (isAhead) {
     summary = "You are ahead — close out the game before enemies can scale.";
-    immediateAction = "Push towers, take Dragons, and force fights you can win.";
     lateGamePlan = "Group as 5 for Baron and end the game through mid lane.";
   } else if (phase === "early") {
     summary = "Focus on farming safely — your power spike comes later.";
-    immediateAction = "Farm under tower if needed and avoid risky all-ins.";
     lateGamePlan = "Once your core items are complete, you win most fights.";
   } else if (enemyHeavyCC) {
     summary = "Avoid extended teamfights — the enemy CC can shut you down.";
-    immediateAction = "Pick off isolated targets and avoid clumping with your team.";
     lateGamePlan = "Use your completed build to split-push or flank in teamfights.";
   } else {
     summary = `Scale into your ${winCondition}-game power spike and then take over.`;
-    immediateAction = "Secure Drake and farm efficiently between skirmishes.";
     lateGamePlan = "With your full build you outscale — force Baron fights to finish.";
   }
 
-  return { winCondition, summary, immediateAction, lateGamePlan };
+  return { winCondition, summary, lateGamePlan };
 }
 
 /**

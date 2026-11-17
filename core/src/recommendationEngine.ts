@@ -160,15 +160,13 @@ export class RecommendationEngine implements IRecommendationEngine {
       this.liveOverrides !== undefined &&
       (Boolean(this.liveOverrides.laneOpponentOverride) ||
         Boolean(this.liveOverrides.campedStatus) ||
-        Object.keys(this.liveOverrides.enemyBuildOverrides).length > 0 ||
-        this.liveOverrides.tacticalNotes.length > 0);
+        Object.keys(this.liveOverrides.enemyBuildOverrides).length > 0);
 
     const overrideSig = hasOverrides
       ? JSON.stringify({
           l: this.liveOverrides?.laneOpponentOverride,
           c: this.liveOverrides?.campedStatus,
           b: this.liveOverrides?.enemyBuildOverrides,
-          n: this.liveOverrides?.tacticalNotes,
         })
       : "";
 
