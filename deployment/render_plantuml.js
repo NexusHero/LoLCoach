@@ -5,29 +5,35 @@
  *  2. Rewrites ../umls/ image paths to /docs/umls/ so md-to-pdf
  *     can resolve them via --basedir (project root)
  *
- * Usage: node deployment/render_plantuml.js <input.md> [output.md]
+ * The input must be a Markdown file directly inside docs/. The result is
+ * written to stdout.
+ *
+ * Usage: node deployment/render_plantuml.js docs/<input.md> > output.md
  */
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-// build_docs.sh writes the preprocessed file to a temp directory.
-const OUTPUT_ROOTS = [PROJECT_ROOT, os.tmpdir(), '/tmp'];
-
-function isInside(root, resolved) {
-  const relative = path.relative(root, resolved);
-  return !relative.startsWith('..') && !path.isAbsolute(relative);
-}
+const DOCS_DIR = path.join(PROJECT_ROOT, 'docs');
 
 /**
- * Resolves a path and refuses anything outside the allowed roots, so neither
- * a CLI argument nor an include directive can read or write elsewhere.
+ * Returns the path of a Markdown file in docs/. The path is built from the
+ * directory listing, never from the argument itself, so the argument cannot
+ * point anywhere else.
  */
-function resolveInside(roots, baseDir, target) {
+function findDocsFile(requested) {
+  const wanted = path.basename(requested);
+  const entry = fs
+    .readdirSync(DOCS_DIR)
+    .find((name) => name === wanted && name.endsWith('.md'));
+  return entry ? path.join(DOCS_DIR, entry) : undefined;
+}
+
+/** Resolves an include target and refuses anything outside the project. */
+function resolveInclude(baseDir, target) {
   const resolved = path.resolve(baseDir, target);
-  if (!roots.some((root) => isInside(root, resolved))) {
-    throw new Error(`Path is outside the allowed directories: ${target}`);
+  if (!resolved.startsWith(PROJECT_ROOT + path.sep)) {
+    throw new Error(`Include is outside the project: ${target}`);
   }
   return resolved;
 }
@@ -35,7 +41,7 @@ function resolveInside(roots, baseDir, target) {
 function resolveIncludes(content, baseDir) {
   return content.replace(
     /<!-- @include: ([^\s>]+) -->/g,
-    (_, relPath) => fs.readFileSync(resolveInside([PROJECT_ROOT], baseDir, relPath), 'utf8')
+    (_, relPath) => fs.readFileSync(resolveInclude(baseDir, relPath), 'utf8')
   );
 }
 
@@ -43,21 +49,15 @@ function rewriteImagePaths(content) {
   return content.replace(/\]\(\.\.\/umls\//g, '](/docs/umls/');
 }
 
-const inputPath = process.argv[2];
-const outputPath = process.argv[3];
+const inputArg = process.argv[2];
+const inputFile = inputArg ? findDocsFile(inputArg) : undefined;
 
-if (!inputPath) {
-  console.error('Usage: node render_plantuml.js <input.md> [output.md]');
+if (!inputFile) {
+  console.error('Usage: node render_plantuml.js docs/<input.md> > output.md');
   process.exit(1);
 }
 
-const safeInputPath = resolveInside([PROJECT_ROOT], process.cwd(), inputPath);
-let content = fs.readFileSync(safeInputPath, 'utf8');
-content = resolveIncludes(content, path.dirname(safeInputPath));
+let content = fs.readFileSync(inputFile, 'utf8');
+content = resolveIncludes(content, DOCS_DIR);
 content = rewriteImagePaths(content);
-
-if (outputPath) {
-  fs.writeFileSync(resolveInside(OUTPUT_ROOTS, process.cwd(), outputPath), content, 'utf8');
-} else {
-  process.stdout.write(content);
-}
+process.stdout.write(content);
