@@ -12,11 +12,11 @@
 @Tags(['golden'])
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lol_coach/models/recommendation.dart';
 import 'package:lol_coach/theme/app_theme.dart';
 import 'package:lol_coach/widgets/recommendation_panel.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   group('RecommendationPanel — golden tests', () {

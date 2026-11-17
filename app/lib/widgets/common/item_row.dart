@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:lol_coach/models/game_state.dart';
 import 'package:lol_coach/widgets/common/item_slot.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ItemRow extends StatelessWidget {
   const ItemRow({required this.items, super.key});

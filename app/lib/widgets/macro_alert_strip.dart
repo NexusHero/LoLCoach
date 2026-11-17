@@ -1,8 +1,8 @@
 // ignore_for_file: lines_longer_than_80_chars
-import 'package:flutter/material.dart';
 import 'package:lol_coach/models/tactical_insights.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Priority-Capped Macro Alert Strip (max 2 pills) + Objective Timers +
 /// Enemy Comp & Counter-Matrix row.

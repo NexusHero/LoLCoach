@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:lol_coach/controllers/settings_controller.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
+import 'package:material_ui/material_ui.dart';
 
 class AdvancedSection extends StatelessWidget {
   const AdvancedSection({required this.ctrl, super.key});

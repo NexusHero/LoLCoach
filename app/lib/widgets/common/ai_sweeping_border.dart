@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
 import 'package:lol_coach/theme/app_colors.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Draws an animated arc sweeping around the border to signal AI activity.
 /// [strokeWidth] controls thickness; [sweepFraction] the length of the arc

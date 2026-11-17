@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:lol_coach/models/recommendation.dart';
 import 'package:lol_coach/models/strategy.dart';
 import 'package:lol_coach/models/tactical_insights.dart';
@@ -12,6 +11,7 @@ import 'package:lol_coach/widgets/common/badge.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
 import 'package:lol_coach/widgets/recommendation/recommendation_item_rows.dart';
 import 'package:lol_coach/widgets/recommendation/recommendation_meta_strips.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// The in-game hero: the single "do this now" recommendation, rendered as the
 /// app's one striking glass card.

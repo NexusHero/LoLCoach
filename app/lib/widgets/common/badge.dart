@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:lol_coach/theme/app_colors.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Token-pair presets for [AppBadge]. [custom] uses the explicit `bg`/`fg`
 /// passed to the default constructor (kept for a few bespoke call-sites).

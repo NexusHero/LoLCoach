@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/utils/ddragon.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ItemSlot extends StatelessWidget {
   const ItemSlot({

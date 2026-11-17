@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Shared quick-switch bar for in-game Build Focus (`Auto`, `Burst`, `DPS`,
 /// `Bruiser`, `Split`) and the `Passive Items` toggle.

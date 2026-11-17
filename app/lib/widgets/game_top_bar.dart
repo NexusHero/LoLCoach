@@ -1,11 +1,11 @@
 // ignore_for_file: lines_longer_than_80_chars
-import 'package:flutter/material.dart';
 import 'package:lol_coach/models/game_state.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/champ_avatar.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
 import 'package:lol_coach/widgets/common/risk_control.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// The pinned HUD telemetry strip: game time · gold to spend · your champion + KDA,
 /// with the risk control integrated inline or beneath, plus an integrated

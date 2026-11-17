@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:lol_coach/models/recommendation.dart';
 import 'package:lol_coach/models/tactical_insights.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/badge.dart';
 import 'package:lol_coach/widgets/common/item_slot.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// The headline item, rendered in a tinted rounded row with a subtle glow.
 class HeroRecommendationItem extends StatelessWidget {
