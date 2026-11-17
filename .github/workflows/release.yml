@@ -45,6 +45,9 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
+          # Pinned to the version CI analyzes and tests with; bump both together
+          # with app/pubspec.lock.
+          flutter-version: '3.44.8'
           channel: 'stable'
 
       - name: Enable Flutter Desktop
