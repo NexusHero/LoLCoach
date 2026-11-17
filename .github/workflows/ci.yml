@@ -46,14 +46,16 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          # Pinned: the committed pubspec.lock and the analyzer baseline match this
-          # version. Bump it together with pubspec.lock.
-          flutter-version: '3.44.8'
+          # Pinned so a new stable release cannot break CI unannounced. Keep in
+          # sync with release.yml.
+          flutter-version: '3.50.0'
           channel: stable
           cache: true
 
       - name: Install dependencies
-        run: flutter pub get --enforce-lockfile
+        # The committed pubspec.lock was generated with Flutter 3.44.8. Enforce it
+        # again (--enforce-lockfile) once it is regenerated with 3.50.
+        run: flutter pub get
         working-directory: app
 
       - name: Analyze

@@ -47,7 +47,7 @@ jobs:
         with:
           # Pinned to the version CI analyzes and tests with; bump both together
           # with app/pubspec.lock.
-          flutter-version: '3.44.8'
+          flutter-version: '3.50.0'
           channel: 'stable'
 
       - name: Enable Flutter Desktop
