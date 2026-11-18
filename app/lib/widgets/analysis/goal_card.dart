@@ -9,6 +9,12 @@ import 'package:material_ui/material_ui.dart';
 const goalBlockSize = 5;
 
 /// The active training goal with its 5-game block progress.
+/// A per-game death target is a whole number, unlike the averages.
+String _targetText(TrainingGoal goal) =>
+    goal.metric == AnalysisMetric.earlyDeaths
+        ? '${goal.target.round()}'
+        : goal.metric.format(goal.target);
+
 class GoalCard extends StatelessWidget {
   const GoalCard({required this.goal, super.key});
   final TrainingGoal goal;
@@ -43,9 +49,7 @@ class GoalCard extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                '${goal.metric.shortLabel} $cmp '
-                // A per-game death target is a whole number, unlike the averages.
-                '${goal.metric == AnalysisMetric.earlyDeaths ? goal.target.round() : goal.metric.format(goal.target)}',
+                '${goal.metric.shortLabel} $cmp ${_targetText(goal)}',
                 style: AppTextStyles.mono.copyWith(color: colors.gold),
               ),
               if (goal.basedOnTier.isNotEmpty)
