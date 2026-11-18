@@ -41,6 +41,8 @@ channels:
           - $ref: '#/components/messages/GameTick'
           - $ref: '#/components/messages/GameInactive'
           - $ref: '#/components/messages/Recommendation'
+          - $ref: '#/components/messages/AnalysisUpdate'
+          - $ref: '#/components/messages/AnalysisAnswer'
 
 components:
   messages:
@@ -102,6 +104,41 @@ components:
       payload:
         $ref: '#/components/schemas/RecommendationMessage'
 
+    AnalysisUpdate:
+      name: ANALYSIS_UPDATE
+      title: Post-game analysis snapshot
+      summary: >
+        Full state of the post-game review board: Riot ID, rank, the last 20
+        reviewed ranked games, rank benchmarks, the training goal, sync and
+        benchmark-collection progress. Sent after GET_ANALYSIS (to the asking
+        client) and broadcast whenever the analysis changes. Shape:
+        AnalysisSnapshot in core/src/analysisTypes.ts.
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/BaseMessage'
+          - type: object
+            required: [analysis]
+            properties:
+              analysis:
+                type: object
+
+    AnalysisAnswer:
+      name: ANALYSIS_ANSWER
+      title: Answer to a question about the match history
+      summary: >
+        Reply to ASK_ANALYSIS, sent only to the asking client. Carries either
+        answer or error for the given requestId.
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/BaseMessage'
+          - type: object
+            required: [requestId]
+            properties:
+              requestId:
+                type: string
+              answer:
+                type: string
+
   schemas:
     BaseMessage:
       type: object
@@ -118,6 +155,8 @@ components:
             - GAME_TICK
             - GAME_INACTIVE
             - RECOMMENDATION
+            - ANALYSIS_UPDATE
+            - ANALYSIS_ANSWER
         timestamp:
           type: integer
           format: int64

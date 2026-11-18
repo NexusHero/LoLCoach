@@ -1,6 +1,7 @@
 // ignore_for_file: lines_longer_than_80_chars
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lol_coach/providers.dart';
+import 'package:lol_coach/screens/analysis_screen.dart';
 import 'package:lol_coach/screens/home_screen.dart';
 import 'package:lol_coach/screens/settings_screen.dart';
 import 'package:lol_coach/services/ws_client.dart';
@@ -86,8 +87,19 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     );
   }
 
+  void _openAnalysis() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AnalysisScreen(onOpenSettings: _openSettings),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return HomeScreen(onOpenSettings: _openSettings);
+    return HomeScreen(
+      onOpenSettings: _openSettings,
+      onOpenAnalysis: _openAnalysis,
+    );
   }
 }

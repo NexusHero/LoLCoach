@@ -1,6 +1,7 @@
 // ignore_for_file: lines_longer_than_80_chars
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lol_coach/providers.dart';
+import 'package:lol_coach/services/analysis_service.dart';
 import 'package:lol_coach/services/coach_service.dart';
 import 'package:lol_coach/services/ws_client.dart';
 import 'package:lol_coach/theme/app_colors.dart';
@@ -21,15 +22,17 @@ String _providerLabel(String type) => switch (type) {
 bool _isAiProvider(String type) => type != 'none' && type.isNotEmpty;
 
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({this.onOpenSettings, super.key});
+  const HomeScreen({this.onOpenSettings, this.onOpenAnalysis, super.key});
 
   final VoidCallback? onOpenSettings;
+  final VoidCallback? onOpenAnalysis;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ws = ref.watch(coachServiceProvider);
+    final analysis = ref.watch(analysisServiceProvider);
     return ListenableBuilder(
-      listenable: ws,
+      listenable: Listenable.merge([ws, analysis]),
       builder: (context, _) {
         final activeChamp = ws.gameActive && ws.gameState != null
             ? ws.gameState!.localPlayer.championName
@@ -67,6 +70,11 @@ class HomeScreen extends ConsumerWidget {
                   onPressed: ws.disconnect,
                 ),
               IconButton(
+                icon: const Icon(Icons.insights_outlined),
+                tooltip: 'Analysis',
+                onPressed: onOpenAnalysis,
+              ),
+              IconButton(
                 icon: const Icon(Icons.settings_outlined),
                 tooltip: 'Settings',
                 onPressed: onOpenSettings,
@@ -76,14 +84,18 @@ class HomeScreen extends ConsumerWidget {
           ),
           body: AppBackground(
             championName: activeChamp,
-            child: SafeArea(child: _buildBody(context, ws)),
+            child: SafeArea(child: _buildBody(context, ws, analysis)),
           ),
         );
       },
     );
   }
 
-  Widget _buildBody(BuildContext context, CoachService ws) {
+  Widget _buildBody(
+    BuildContext context,
+    CoachService ws,
+    AnalysisService analysis,
+  ) {
     switch (ws.status) {
       case ConnectionStatus.disconnected:
       case ConnectionStatus.error:
@@ -109,6 +121,8 @@ class HomeScreen extends ConsumerWidget {
           return StandbyDashboard(
             autopsy: ws.postGameAutopsy ?? ws.playerProfile?.lastAutopsy,
             profile: ws.playerProfile,
+            analysis: analysis.snapshot,
+            onOpenAnalysis: onOpenAnalysis,
           );
         }
         return GameView(

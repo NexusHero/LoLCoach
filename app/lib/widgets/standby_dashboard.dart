@@ -1,4 +1,5 @@
 // ignore_for_file: lines_longer_than_80_chars
+import 'package:lol_coach/models/analysis.dart';
 import 'package:lol_coach/models/tactical_insights.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
@@ -12,10 +13,14 @@ class StandbyDashboard extends StatefulWidget {
     super.key,
     this.autopsy,
     this.profile,
+    this.analysis,
+    this.onOpenAnalysis,
   });
 
   final PostGameAutopsy? autopsy;
   final PlayerHabitProfile? profile;
+  final AnalysisSnapshot? analysis;
+  final VoidCallback? onOpenAnalysis;
 
   @override
   State<StandbyDashboard> createState() => _StandbyDashboardState();
@@ -136,11 +141,102 @@ class _StandbyDashboardState extends State<StandbyDashboard>
                   ],
                 ),
               ),
+              if (widget.onOpenAnalysis != null) ...[
+                const SizedBox(height: 16),
+                AnalysisStandbyTile(
+                  analysis: widget.analysis,
+                  onTap: widget.onOpenAnalysis!,
+                ),
+              ],
               if (autopsy != null) ...[
                 const SizedBox(height: 16),
                 PostGameAutopsyCard(autopsy: autopsy),
               ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact entry point to the Analysis screen: latest result + active goal.
+class AnalysisStandbyTile extends StatelessWidget {
+  const AnalysisStandbyTile({
+    required this.onTap,
+    this.analysis,
+    super.key,
+  });
+
+  final AnalysisSnapshot? analysis;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final latest = analysis != null && analysis!.matches.isNotEmpty
+        ? analysis!.matches.first
+        : null;
+    final goal = analysis?.goal;
+    final resultLine = latest == null
+        ? 'No reviewed matches yet'
+        : '${latest.win ? 'Win' : 'Loss'} · ${latest.champion}'
+            '${latest.opponentChampion == null ? '' : ' vs ${latest.opponentChampion}'}'
+            ' · ${latest.kda}';
+
+    return GameCard(
+      padding: EdgeInsets.zero,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          key: const ValueKey('analysisStandbyTile'),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                Icon(Icons.insights_outlined, size: 22, color: colors.cyan),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ANALYSIS',
+                        style: AppTextStyles.eyebrow.copyWith(
+                          color: colors.cyan,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        resultLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.mono.copyWith(
+                          color: latest == null
+                              ? colors.textSecondary
+                              : latest.win
+                                  ? colors.success
+                                  : colors.errorLight,
+                        ),
+                      ),
+                      if (goal != null && goal.text.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          goal.text,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption.copyWith(
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: colors.textSecondary),
+              ],
+            ),
           ),
         ),
       ),

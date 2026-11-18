@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lol_coach/services/analysis_service.dart';
 import 'package:lol_coach/services/coach_service.dart';
 import 'package:lol_coach/services/storage_service.dart';
 import 'package:lol_coach/services/ws_client.dart';
@@ -27,6 +28,16 @@ final wsClientProvider = Provider<WsClient>((ref) {
 /// rebuild on internal state changes still wrap with `ListenableBuilder`.
 final coachServiceProvider = Provider<CoachService>((ref) {
   final service = CoachService(
+    ref.watch(wsClientProvider),
+    ref.watch(storageServiceProvider),
+  );
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+/// Post-game review board state (ANALYSIS_UPDATE / ANALYSIS_ANSWER).
+final analysisServiceProvider = Provider<AnalysisService>((ref) {
+  final service = AnalysisService(
     ref.watch(wsClientProvider),
     ref.watch(storageServiceProvider),
   );

@@ -1,3 +1,4 @@
+import 'package:lol_coach/services/analysis_service.dart';
 import 'package:lol_coach/services/coach_service.dart';
 import 'package:lol_coach/services/storage_service.dart';
 import 'package:lol_coach/services/ws_client.dart';
@@ -23,15 +24,18 @@ class SettingsController extends ChangeNotifier {
   SettingsController({
     required StorageService storage,
     required CoachService coach,
+    AnalysisService? analysis,
     this.onConnected,
   })  : _storage = storage,
-        _coach = coach {
+        _coach = coach,
+        _analysis = analysis {
     _init();
     _coach.addListener(notifyListeners);
   }
 
   final StorageService _storage;
   final CoachService _coach;
+  final AnalysisService? _analysis;
   final VoidCallback? onConnected;
 
   final hostCtrl = TextEditingController(text: '127.0.0.1');
@@ -39,13 +43,18 @@ class SettingsController extends ChangeNotifier {
   final summonerCtrl = TextEditingController();
   final apiKeyCtrl = TextEditingController();
   final tokenBudgetCtrl = TextEditingController();
+  final riotIdCtrl = TextEditingController();
 
   String? _ipError;
+  String? _riotIdError;
+  String _riotRegion = 'EUW';
   String _providerType = 'none';
   String _selectedModel = '';
   bool _showAdvanced = false;
 
   String? get ipError => _ipError;
+  String? get riotIdError => _riotIdError;
+  String get riotRegion => _riotRegion;
   String get providerType => _providerType;
   String get selectedModel => _selectedModel;
   bool get showAdvanced => _showAdvanced;
@@ -81,6 +90,9 @@ class SettingsController extends ChangeNotifier {
     hostCtrl.text = _storage.host ?? '127.0.0.1';
     portCtrl.text = _storage.port ?? '8765';
     summonerCtrl.text = _storage.summonerName ?? '';
+    riotIdCtrl.text = _storage.riotId ?? '';
+    _riotRegion =
+        riotRegions.contains(_storage.riotRegion) ? _storage.riotRegion : 'EUW';
     _providerType = _storage.providerType ?? 'none';
     _selectedModel = _storage.selectedModel ?? '';
     apiKeyCtrl.text = await _storage.getApiKey() ?? '';
@@ -100,6 +112,11 @@ class SettingsController extends ChangeNotifier {
 
   void setSelectedModel(String val) {
     _selectedModel = val;
+    notifyListeners();
+  }
+
+  void setRiotRegion(String val) {
+    _riotRegion = val;
     notifyListeners();
   }
 
@@ -124,6 +141,13 @@ class SettingsController extends ChangeNotifier {
       notifyListeners();
     }
 
+    final riotId = riotIdCtrl.text.trim();
+    _riotIdError = validateRiotId(riotId);
+    if (_riotIdError != null) {
+      notifyListeners();
+      return;
+    }
+
     final portString = portCtrl.text.trim();
     final port = int.tryParse(portString) ?? 8765;
     final summonerName = summonerCtrl.text.trim();
@@ -137,6 +161,13 @@ class SettingsController extends ChangeNotifier {
     await _storage.setSelectedModel(_selectedModel);
     await _storage.setTokenBudget(tokenBudget);
     await _storage.setApiKey(apiKey);
+    if (_analysis != null) {
+      // Persists and sends SET_RIOT_ID (now if connected, else on connect).
+      _analysis.setRiotId(riotId, _riotRegion);
+    } else {
+      await _storage.setRiotId(riotId);
+      await _storage.setRiotRegion(_riotRegion);
+    }
 
     final models = currentModels;
     final effectiveModel =
@@ -179,6 +210,7 @@ class SettingsController extends ChangeNotifier {
     summonerCtrl.dispose();
     apiKeyCtrl.dispose();
     tokenBudgetCtrl.dispose();
+    riotIdCtrl.dispose();
     super.dispose();
   }
 }

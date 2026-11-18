@@ -1,5 +1,5 @@
 import { Anthropic } from "@anthropic-ai/sdk";
-import type { LlmProvider, LlmAnalysis, ModelInfo, TokenUsage, LlmContextOptions } from "../llmProvider.js";
+import type { LlmProvider, LlmAnalysis, ModelInfo, TokenUsage, LlmContextOptions, TextCompletion } from "../llmProvider.js";
 import { SYSTEM_PROMPT, buildUserPrompt, parseAnalysisResponse } from "../llmProvider.js";
 import type { ParsedGameState, RiskLevel } from "../types.js";
 import { DEFAULT_RISK_LEVEL } from "../types.js";
@@ -61,6 +61,27 @@ export class ClaudeProvider implements LlmProvider {
       );
 
       return { ...parseAnalysisResponse(block.text), tokenUsage };
+    } catch (err) {
+      throw new Error(`Claude: ${this.formatError(err)}`);
+    }
+  }
+
+  async completeText(system: string, user: string, maxTokens = 600): Promise<TextCompletion> {
+    try {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: "user", content: user }],
+      });
+      const text = response.content
+        .filter((b) => b.type === "text")
+        .map((b) => (b as { text: string }).text)
+        .join("");
+      return {
+        text,
+        tokenUsage: { input: response.usage.input_tokens, output: response.usage.output_tokens },
+      };
     } catch (err) {
       throw new Error(`Claude: ${this.formatError(err)}`);
     }
