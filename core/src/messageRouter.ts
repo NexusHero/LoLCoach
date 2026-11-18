@@ -6,6 +6,8 @@ import { Logger } from "./logger.js";
 import { createLlmProvider } from "./llmProvider.js";
 import type { ProviderType } from "./llmProvider.js";
 import type { RiskLevel, BuildFocus } from "./types.js";
+import type { AnalysisService } from "./analysisService.js";
+import { REGION_ROUTING } from "./riotApi.js";
 
 const VALID_RISK_LEVELS: readonly RiskLevel[] = ["safe", "normal", "risky"];
 const VALID_BUILD_FOCUSES: readonly BuildFocus[] = ["auto", "burst", "dps", "bruiser", "split"];
@@ -15,6 +17,7 @@ type MessageHandler = (ws: WebSocket, message: Record<string, unknown>) => Promi
 @singleton()
 export class MessageRouter {
   private readonly handlers: ReadonlyMap<string, MessageHandler>;
+  private analysis: AnalysisService | undefined;
 
   constructor(@inject(BridgeOrchestrator) private readonly orchestrator: BridgeOrchestrator) {
     this.handlers = new Map([
@@ -29,8 +32,44 @@ export class MessageRouter {
       ["CLEAR_TACTICAL_OVERRIDE", this.handleClearTacticalOverride],
       ["GET_MODELS", this.handleGetModels],
       ["VALIDATE_KEY", this.handleValidateKey],
+      ["GET_ANALYSIS", this.handleGetAnalysis],
+      ["REFRESH_ANALYSIS", this.handleRefreshAnalysis],
+      ["SET_RIOT_ID", this.handleSetRiotId],
+      ["ASK_ANALYSIS", this.handleAskAnalysis],
     ]);
   }
+
+  /** Wired after construction; the analysis service is created outside the DI container. */
+  setAnalysisService(service: AnalysisService): void {
+    this.analysis = service;
+  }
+
+  private handleGetAnalysis: MessageHandler = (ws) => {
+    if (!this.analysis) return;
+    ws.send(JSON.stringify({ event: "ANALYSIS_UPDATE", timestamp: Date.now(), analysis: this.analysis.snapshot() }));
+  };
+
+  private handleRefreshAnalysis: MessageHandler = async () => {
+    await this.analysis?.refresh();
+  };
+
+  private handleSetRiotId: MessageHandler = async (_ws, message) => {
+    const riotId = typeof message.riotId === "string" ? message.riotId.trim() : "";
+    const region = typeof message.region === "string" ? message.region.toUpperCase() : "EUW";
+    if (!/^[^#]+#[^#]+$/.test(riotId) || !REGION_ROUTING[region]) {
+      Logger.warn(`[MessageRouter] Ignoring invalid Riot ID or region: ${riotId} / ${region}`);
+      return;
+    }
+    await this.analysis?.setRiotId(riotId, region);
+  };
+
+  private handleAskAnalysis: MessageHandler = async (ws, message) => {
+    const question = typeof message.question === "string" ? message.question.trim() : "";
+    const requestId = typeof message.requestId === "string" ? message.requestId : "";
+    if (!this.analysis || !question || !requestId) return;
+    const answer = await this.analysis.ask(question.slice(0, 500), requestId);
+    ws.send(JSON.stringify({ event: "ANALYSIS_ANSWER", timestamp: Date.now(), ...answer }));
+  };
 
   async handle(ws: WebSocket, message: Record<string, unknown>): Promise<void> {
     const event = message.event;
@@ -135,6 +174,7 @@ export class MessageRouter {
     if (!providerType || !apiKey) {
       Logger.info("[MessageRouter] LLM provider disabled.");
       this.orchestrator.setLlmProvider(null);
+      this.analysis?.setLlmProvider(null);
       this.orchestrator.setEmbeddingConfig?.({ provider: "none" });
       return;
     }
@@ -142,10 +182,12 @@ export class MessageRouter {
     try {
       const provider = await createLlmProvider(providerType, apiKey, model);
       this.orchestrator.setLlmProvider(provider);
+      this.analysis?.setLlmProvider(provider);
       this.orchestrator.setEmbeddingConfig?.({ provider: providerType, apiKey });
     } catch (err) {
       Logger.error("[MessageRouter] Failed to create LLM provider:", err);
       this.orchestrator.setLlmProvider(null);
+      this.analysis?.setLlmProvider(null);
       this.orchestrator.setEmbeddingConfig?.({ provider: "none" });
     }
   };

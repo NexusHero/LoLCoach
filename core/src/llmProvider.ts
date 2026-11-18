@@ -66,6 +66,13 @@ export interface LlmProvider {
     risk?: RiskLevel,
     options?: LlmContextOptions,
   ): Promise<LlmAnalysis>;
+  /** Free-form text completion, used by the post-game analysis. */
+  completeText?(system: string, user: string, maxTokens?: number): Promise<TextCompletion>;
+}
+
+export interface TextCompletion {
+  text: string;
+  tokenUsage?: TokenUsage;
 }
 
 export type ProviderType = "claude" | "openai" | "gemini";

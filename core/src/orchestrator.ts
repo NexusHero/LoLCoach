@@ -271,6 +271,11 @@ export class BridgeOrchestrator {
     return autopsy;
   }
 
+  /** True while live game data is flowing. */
+  isGameActive(): boolean {
+    return this.lastState !== null;
+  }
+
   getPlayerProfile(): PlayerHabitProfile {
     return this.profileService.getProfile();
   }

@@ -22,6 +22,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _ctrl = SettingsController(
       storage: ref.read(storageServiceProvider),
       coach: ref.read(coachServiceProvider),
+      analysis: ref.read(analysisServiceProvider),
       onConnected: widget.onConnected,
     );
   }

@@ -24,6 +24,16 @@ class StorageService {
   Future<void> setSummonerName(String value) =>
       _prefs.setString('summonerName', value);
 
+  // --- Analysis (post-game review) ---
+  /// Riot ID in the form Name#TAG; null/empty when not set.
+  String? get riotId => _prefs.getString('riotId');
+  Future<void> setRiotId(String value) => _prefs.setString('riotId', value);
+
+  /// Riot platform region, e.g. 'EUW'.
+  String get riotRegion => _prefs.getString('riotRegion') ?? 'EUW';
+  Future<void> setRiotRegion(String value) =>
+      _prefs.setString('riotRegion', value);
+
   // --- AI Settings ---
   String? get providerType => _prefs.getString('providerType');
   Future<void> setProviderType(String value) =>

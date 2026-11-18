@@ -5,6 +5,7 @@ import 'package:lol_coach/widgets/common/game_card.dart';
 import 'package:lol_coach/widgets/settings/advanced_section.dart';
 import 'package:lol_coach/widgets/settings/appearance_section.dart';
 import 'package:lol_coach/widgets/settings/provider_section.dart';
+import 'package:lol_coach/widgets/settings/riot_id_section.dart';
 import 'package:material_ui/material_ui.dart';
 
 class ConnectionForm extends StatelessWidget {
@@ -77,6 +78,8 @@ class ConnectionForm extends StatelessWidget {
                       keyboardType: TextInputType.text,
                       textInputAction: TextInputAction.next,
                     ),
+                    const SizedBox(height: 18),
+                    RiotIdSection(ctrl: ctrl),
                     const SizedBox(height: 18),
                     ProviderSection(ctrl: ctrl),
                     const SizedBox(height: 22),

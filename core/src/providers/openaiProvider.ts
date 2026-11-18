@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { LlmProvider, LlmAnalysis, ModelInfo, TokenUsage, LlmContextOptions } from "../llmProvider.js";
+import type { LlmProvider, LlmAnalysis, ModelInfo, TokenUsage, LlmContextOptions, TextCompletion } from "../llmProvider.js";
 import { SYSTEM_PROMPT, buildUserPrompt, parseAnalysisResponse } from "../llmProvider.js";
 import type { ParsedGameState, RiskLevel } from "../types.js";
 import { DEFAULT_RISK_LEVEL } from "../types.js";
@@ -53,6 +53,28 @@ export class OpenAiProvider implements LlmProvider {
       );
 
       return { ...parseAnalysisResponse(text), tokenUsage };
+    } catch (err) {
+      throw new Error(`OpenAI: ${this.formatError(err)}`);
+    }
+  }
+
+  async completeText(system: string, user: string, maxTokens = 600): Promise<TextCompletion> {
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        max_tokens: maxTokens,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      });
+      return {
+        text: response.choices[0]?.message?.content ?? "",
+        tokenUsage: {
+          input: response.usage?.prompt_tokens ?? 0,
+          output: response.usage?.completion_tokens ?? 0,
+        },
+      };
     } catch (err) {
       throw new Error(`OpenAI: ${this.formatError(err)}`);
     }

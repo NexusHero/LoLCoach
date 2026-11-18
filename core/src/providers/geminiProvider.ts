@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import type { LlmProvider, LlmAnalysis, ModelInfo, TokenUsage, LlmContextOptions } from "../llmProvider.js";
+import type { LlmProvider, LlmAnalysis, ModelInfo, TokenUsage, LlmContextOptions, TextCompletion } from "../llmProvider.js";
 import { SYSTEM_PROMPT, buildUserPrompt, parseAnalysisResponse } from "../llmProvider.js";
 import type { ParsedGameState, RiskLevel } from "../types.js";
 import { DEFAULT_RISK_LEVEL } from "../types.js";
@@ -93,6 +93,23 @@ export class GeminiProvider implements LlmProvider {
       Logger.info(`[LLM:Gemini] Tokens: ${tokenUsage.input} in, ${tokenUsage.output} out`);
 
       return { ...parseAnalysisResponse(text), tokenUsage };
+    } catch (err) {
+      throw new Error(`Gemini: ${this.formatError(err)}`);
+    }
+  }
+
+  async completeText(system: string, user: string, maxTokens = 600): Promise<TextCompletion> {
+    try {
+      const result = await this.client.models.generateContent({
+        model: this.modelId,
+        contents: user,
+        config: { systemInstruction: system, maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } },
+      });
+      const meta = result.usageMetadata;
+      return {
+        text: result.text ?? "",
+        tokenUsage: { input: meta?.promptTokenCount ?? 0, output: meta?.candidatesTokenCount ?? 0 },
+      };
     } catch (err) {
       throw new Error(`Gemini: ${this.formatError(err)}`);
     }

@@ -8,6 +8,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · Versioning: 
 
 ## [Unreleased]
 
+### Added
+- **Post-game review & analysis board.** The core pulls your last 20 Ranked Solo/Duo games from the Riot API (Riot ID and region in Settings, `RIOT_API_KEY` in `core/.env`) and computes per game: CS and CS difference at 10:00, deaths before 14:00 with map zone and killer, gold and XP difference at 15:00, objective presence, minute-by-minute lane differences, first core item and shop visits. New games are fetched automatically shortly after a game ends.
+- **Rank benchmarks from your own collection.** In the background the core samples ranked games of the tier above yours and of Master, Grandmaster and Challenger for your main role, stores only averages, and re-collects every patch.
+- **Training goals.** One goal per block of 5 games, chosen from the metric with the largest gap to the next tier; achieved at 4 of 5 games, otherwise the block repeats.
+- **AI in the analysis.** With an LLM provider configured: a short review per new game, the goal sentence, a summary of the backfilled games, questions about your history, and one matchup insight per game written to the matchup memory. All numbers are computed by code.
+
 ### Removed
 - Live features that Riot's third-party policy does not permit: enemy ability and summoner-spell cooldown estimates and 1-click timers, the jungle gank-window, shutdown and level-6 alerts, and the LLM "immediate action" and "counter-play" lines. The live HUD now shows objective countdowns, own unspent gold, the next buy and the build plan only.
 - The LLM call on the objective setup window; the LLM now runs on game start, item purchase, death, high gold and manual refresh.

@@ -11,6 +11,8 @@ import { RecommendationEngine } from "./recommendationEngine.js";
 import { BridgeWsServer } from "./wsServer.js";
 import { BridgeOrchestrator } from "./orchestrator.js";
 import { MessageRouter } from "./messageRouter.js";
+import { AnalysisService } from "./analysisService.js";
+import { AnalysisStore } from "./analysisStore.js";
 import { createLlmProvider } from "./llmProvider.js";
 import { ddragon } from "./ddragonService.js";
 import { loadOrCreateSecret, secretFilePath } from "./secretManager.js";
@@ -27,7 +29,7 @@ import {
 } from "./tokens.js";
 
 // DDragon im Hintergrund initialisieren — kein blocking start
-ddragon.init().catch((err) => Logger.error("[Main] DDragon init error:", err));
+const ddragonReady = ddragon.init().catch((err) => Logger.error("[Main] DDragon init error:", err));
 
 const LOCAL_SUMMONER = process.env.SUMMONER_NAME ?? "";
 if (!LOCAL_SUMMONER) {
@@ -111,11 +113,26 @@ orchestrator.initialize().catch((err) => {
 const messageRouter = container.resolve(MessageRouter);
 wsServer.setMessageHandler((ws, message) => messageRouter.handle(ws, message));
 
+const analysisService = new AnalysisService({
+  store: new AnalysisStore(),
+  broadcast: (analysis) => wsServer.broadcast({ event: "ANALYSIS_UPDATE", timestamp: Date.now(), analysis }),
+  items: (id) => ddragon.getItemInfo(id),
+  isGameActive: () => orchestrator.isGameActive(),
+  storeMatchupNote: (champ, note, opp) =>
+    orchestrator.getVectorMemoryService().storeMatchupNote(champ, note, opp),
+});
+messageRouter.setAnalysisService(analysisService);
+// Wait for item data so the first reviews get item names and core-item detection.
+ddragonReady.then(() => analysisService.start()).catch((err) => {
+  Logger.warn("[Main] Failed to start the post-game analysis:", err);
+});
+
 // Backward compatible: use ANTHROPIC_API_KEY from .env if present
 if (process.env.ANTHROPIC_API_KEY) {
   createLlmProvider("claude", process.env.ANTHROPIC_API_KEY)
     .then((provider) => {
       orchestrator.setLlmProvider(provider);
+      analysisService.setLlmProvider(provider);
       Logger.info("[Main] Using Claude provider from ANTHROPIC_API_KEY env var.");
     })
     .catch((err) => {
@@ -127,7 +144,9 @@ const poller = new LiveClientPoller(
   (data) => orchestrator.handleGameData(data),
   (active) => {
     if (!active) {
+      const wasInGame = orchestrator.isGameActive();
       const autopsy = orchestrator.resetDetector();
+      if (wasInGame) analysisService.onGameEnded();
       wsServer.broadcast({
         event: "GAME_INACTIVE",
         timestamp: Date.now(),
