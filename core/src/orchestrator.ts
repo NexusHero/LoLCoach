@@ -49,6 +49,7 @@ export class BridgeOrchestrator {
   private readonly profileService = new PlayerProfileService();
   private readonly vectorMemory = new VectorMemoryService();
   private readonly commandService = new TacticalCommandService(this.vectorMemory);
+  private gameStartListener?: (state: ParsedGameState, opponentChampion?: string) => void;
 
   constructor(
     @inject(WS_BROADCASTER_TOKEN) private readonly wsServer: IWsBroadcaster,
@@ -124,6 +125,7 @@ export class BridgeOrchestrator {
         3,
       );
       this.engine.setVectorMemories?.(memories);
+      this.gameStartListener?.(state, opp?.championName);
     }
 
     for (const event of events) {
@@ -269,6 +271,11 @@ export class BridgeOrchestrator {
     this.eventDetector.reset();
     this.engine.reset();
     return autopsy;
+  }
+
+  /** Called once per game when GAME_STARTED fires, with the lane opponent if known. */
+  setGameStartListener(listener: (state: ParsedGameState, opponentChampion?: string) => void): void {
+    this.gameStartListener = listener;
   }
 
   /** True while live game data is flowing. */

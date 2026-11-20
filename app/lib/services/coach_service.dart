@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:lol_coach/models/analysis.dart';
 import 'package:lol_coach/models/game_state.dart';
 import 'package:lol_coach/models/model_info.dart';
 import 'package:lol_coach/models/recommendation.dart';
@@ -32,6 +33,7 @@ class CoachService extends ChangeNotifier {
   TacticalInsights? _tacticalInsights;
   PlayerHabitProfile? _playerProfile;
   PostGameAutopsy? _postGameAutopsy;
+  MatchupBriefing? _briefing;
   final List<CoachExchange> _coachHistory = [];
   String _lastEvent = '';
   bool _gameActive = false;
@@ -91,6 +93,14 @@ class CoachService extends ChangeNotifier {
   TacticalInsights? get tacticalInsights => _tacticalInsights;
   PlayerHabitProfile? get playerProfile => _playerProfile;
   PostGameAutopsy? get postGameAutopsy => _postGameAutopsy;
+
+  /// Matchup briefing of the running game, until dismissed or the game ends.
+  MatchupBriefing? get briefing => _briefing;
+
+  void dismissBriefing() {
+    _briefing = null;
+    notifyListeners();
+  }
   String get lastEvent => _lastEvent;
   bool get gameActive => _gameActive;
   bool get isAnalyzing => _isAnalyzing;
@@ -332,7 +342,10 @@ class CoachService extends ChangeNotifier {
       }
 
       switch (msg.event) {
+        case 'MATCHUP_BRIEFING':
+          _briefing = msg.briefing ?? _briefing;
         case 'GAME_INACTIVE':
+          _briefing = null;
           _gameActive = false;
           _gameState = null;
           _recommendation = null;

@@ -1,5 +1,6 @@
 // ignore_for_file: lines_longer_than_80_chars
 import 'package:flutter/services.dart';
+import 'package:lol_coach/models/analysis.dart';
 import 'package:lol_coach/models/game_state.dart';
 import 'package:lol_coach/models/recommendation.dart';
 import 'package:lol_coach/models/tactical_insights.dart';
@@ -11,6 +12,7 @@ import 'package:lol_coach/widgets/common/game_card.dart';
 import 'package:lol_coach/widgets/game_top_bar.dart';
 import 'package:lol_coach/widgets/local_player_card.dart';
 import 'package:lol_coach/widgets/macro_alert_strip.dart';
+import 'package:lol_coach/widgets/matchup_briefing_card.dart';
 import 'package:lol_coach/widgets/recommendation_panel.dart';
 import 'package:lol_coach/widgets/scoreboard.dart';
 import 'package:lol_coach/widgets/tactical_comms_bar.dart';
@@ -44,8 +46,12 @@ class GameView extends StatelessWidget {
     this.onVoiceToggled,
     this.onRefresh,
     this.aiEnabled = true,
+    this.briefing,
+    this.onDismissBriefing,
   });
   final ParsedGameState gameState;
+  final MatchupBriefing? briefing;
+  final VoidCallback? onDismissBriefing;
   final ItemRecommendation? recommendation;
   final TacticalInsights? tacticalInsights;
   final String lastEvent;
@@ -161,6 +167,15 @@ class GameView extends StatelessWidget {
                 onRefresh: onRefresh,
                 isAnalyzing: isAnalyzing,
               ),
+              if (briefing != null &&
+                  briefing!.points.isNotEmpty &&
+                  gameState.gameTime < briefingVisibleUntilSec) ...[
+                const SizedBox(height: 10),
+                MatchupBriefingCard(
+                  briefing: briefing!,
+                  onDismiss: onDismissBriefing,
+                ),
+              ],
               if (tacticalInsights != null) ...[
                 const SizedBox(height: 10),
                 MacroAlertStrip(insights: tacticalInsights!),

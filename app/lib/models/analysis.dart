@@ -541,3 +541,46 @@ String formatGameTime(int seconds) {
   final s = (seconds % 60).toString().padLeft(2, '0');
   return '$m:$s';
 }
+
+/// Kind of a briefing line: LLM matchup facts or the player's own history.
+enum BriefingKind { trading, spike, history }
+
+class BriefingPoint {
+  const BriefingPoint({required this.kind, required this.text});
+
+  factory BriefingPoint.fromJson(Map<String, dynamic> json) => BriefingPoint(
+        kind: BriefingKind.values.firstWhere(
+          (k) => k.name == json['kind'],
+          orElse: () => BriefingKind.history,
+        ),
+        text: _s(json['text']),
+      );
+
+  final BriefingKind kind;
+  final String text;
+}
+
+/// Pre-lane matchup briefing, sent by the core at game start.
+class MatchupBriefing {
+  const MatchupBriefing({
+    required this.myChampion,
+    required this.opponentChampion,
+    required this.role,
+    required this.points,
+  });
+
+  factory MatchupBriefing.fromJson(Map<String, dynamic> json) =>
+      MatchupBriefing(
+        myChampion: _s(json['myChampion']),
+        opponentChampion: _s(json['opponentChampion']),
+        role: _s(json['role']),
+        points: _list(json['points'], BriefingPoint.fromJson)
+            .where((p) => p.text.isNotEmpty)
+            .toList(),
+      );
+
+  final String myChampion;
+  final String opponentChampion;
+  final String role;
+  final List<BriefingPoint> points;
+}

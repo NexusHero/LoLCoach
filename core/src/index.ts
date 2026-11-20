@@ -120,6 +120,20 @@ const analysisService = new AnalysisService({
   isGameActive: () => orchestrator.isGameActive(),
   storeMatchupNote: (champ, note, opp) =>
     orchestrator.getVectorMemoryService().storeMatchupNote(champ, note, opp),
+  searchMatchupNotes: (champ, opp) =>
+    orchestrator.getVectorMemoryService().searchRelevantMemories(`${champ} vs ${opp}`, champ, opp, 1),
+  abilitiesOf: async (champion) => {
+    const a = await ddragon.getChampionAbilities(champion);
+    return a ? `Q ${a.q}, W ${a.w}, E ${a.e}, R ${a.r}` : undefined;
+  },
+});
+orchestrator.setGameStartListener((state, opponent) => {
+  analysisService
+    .createBriefing(state, opponent)
+    .then((briefing) => {
+      if (briefing) wsServer.broadcast({ event: "MATCHUP_BRIEFING", timestamp: Date.now(), briefing });
+    })
+    .catch((err) => Logger.warn("[Main] Matchup briefing failed:", err));
 });
 messageRouter.setAnalysisService(analysisService);
 // Wait for item data so the first reviews get item names and core-item detection.
