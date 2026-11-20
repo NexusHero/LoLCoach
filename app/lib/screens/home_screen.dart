@@ -147,6 +147,8 @@ class HomeScreen extends ConsumerWidget {
           onSendCoachCommand: ws.sendCoachCommand,
           onClearOverride: ws.clearTacticalOverride,
           lastCoachExchange: ws.lastCoachExchange,
+          briefing: ws.briefing,
+          onDismissBriefing: ws.dismissBriefing,
           voiceEnabled: ws.voiceEnabled,
           onVoiceToggled: (v) => ws.setVoiceEnabled(enabled: v),
           onRefresh: ws.triggerAnalysis,

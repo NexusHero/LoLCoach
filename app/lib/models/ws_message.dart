@@ -1,3 +1,4 @@
+import 'package:lol_coach/models/analysis.dart';
 import 'package:lol_coach/models/game_state.dart';
 import 'package:lol_coach/models/recommendation.dart';
 import 'package:lol_coach/models/tactical_insights.dart';
@@ -18,6 +19,7 @@ class WsMessage {
     this.sessionInputTokens,
     this.budget,
     this.triggerEvent,
+    this.briefing,
   });
 
   factory WsMessage.fromJson(Map<String, dynamic> json) => WsMessage(
@@ -42,6 +44,9 @@ class WsMessage {
             ? PlayerHabitProfile.fromJson(
                 json['playerProfile'] as Map<String, dynamic>,
               )
+            : null,
+        briefing: json['briefing'] is Map<String, dynamic>
+            ? MatchupBriefing.fromJson(json['briefing'] as Map<String, dynamic>)
             : null,
         postGameAutopsy: json['postGameAutopsy'] != null
             ? PostGameAutopsy.fromJson(
@@ -75,4 +80,5 @@ class WsMessage {
   final int? sessionInputTokens;
   final int? budget;
   final String? triggerEvent;
+  final MatchupBriefing? briefing;
 }

@@ -9,6 +9,12 @@ import { BenchmarkAggregator, SAMPLES_PER_TIER, toBenchmark } from "../benchmark
 import type { LlmProvider } from "../llmProvider";
 import { RateLimiter, RiotApiError, type RiotApiClient, type RiotMatch, type RiotTimeline } from "../riotApi";
 import type { TierAggregate } from "../analysisStore";
+import type { ParsedGameState } from "../types";
+import { makeGameState, makePlayer } from "./fixtures";
+
+function makeLiveState(champion: string, position: string): ParsedGameState {
+  return makeGameState({ localPlayer: makePlayer({ championName: champion, position }) });
+}
 
 const baseMatch = JSON.parse(readFileSync(join(__dirname, "fixtures", "match.json"), "utf8")) as RiotMatch;
 const timeline = JSON.parse(readFileSync(join(__dirname, "fixtures", "timeline.json"), "utf8")) as RiotTimeline;
@@ -159,6 +165,37 @@ describe("AnalysisService", () => {
     const answer = await service.ask("Why do I lose lane?", "q2");
 
     expect(answer).toEqual({ requestId: "q2", answer: "Because of early deaths." });
+  });
+});
+
+describe("AnalysisService briefing", () => {
+  it("createBriefing_WithProviderAndPastGame_CombinesLlmFactsAndHistory", async () => {
+    const llm = fakeLlm('{"trading":"Hwei pokes from range.","spike":"Hwei level 6 zone."}');
+    const { service } = setup(fakeClient(["EUW1_1"]), llm);
+    await service.setRiotId("Tester#EUW", "EUW");
+    const live = makeLiveState("Malzahar", "MIDDLE");
+
+    const briefing = await service.createBriefing(live, "Hwei");
+
+    expect(briefing?.points.map((p) => p.kind)).toEqual(["trading", "spike", "history"]);
+    expect(briefing?.points[2].text).toMatch(/^Last time \(loss/);
+    expect(service.currentBriefing()).toBe(briefing);
+  });
+
+  it("createBriefing_NoProvider_OnlyHistoryAndClearedAfterGame", async () => {
+    const { service } = setup(fakeClient(["EUW1_1"]));
+    await service.setRiotId("Tester#EUW", "EUW");
+
+    const briefing = await service.createBriefing(makeLiveState("Ahri", "MIDDLE"), "Zed");
+
+    expect(briefing?.points).toEqual([{ kind: "history", text: "No reviewed game against Zed yet." }]);
+    service.onGameEnded();
+    expect(service.currentBriefing()).toBeUndefined();
+  });
+
+  it("createBriefing_NoOpponent_ReturnsUndefined", async () => {
+    const { service } = setup(fakeClient([]));
+    expect(await service.createBriefing(makeLiveState("Ahri", "MIDDLE"), undefined)).toBeUndefined();
   });
 });
 

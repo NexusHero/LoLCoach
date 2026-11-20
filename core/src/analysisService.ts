@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
   AnalysisAnswer,
+  MatchupBriefing,
   AnalysisSnapshot,
   Benchmark,
   MatchReview,
@@ -31,6 +32,15 @@ import type { LlmProvider } from "./llmProvider.js";
 import { Logger } from "./logger.js";
 import { computeMatchReview, type ItemLookup } from "./matchMetrics.js";
 import { RiotApiClient, RiotApiError } from "./riotApi.js";
+import type { ParsedGameState } from "./types.js";
+import {
+  BRIEFING_SYSTEM,
+  assembleBriefing,
+  briefingPrompt,
+  historyPoint,
+  lastMatchInMatchup,
+  parseBriefingReply,
+} from "./briefing.js";
 
 export const MATCH_HISTORY_SIZE = 20;
 /** Riot publishes a finished match after a short delay; retry at these offsets. */
@@ -108,6 +118,10 @@ export interface AnalysisServiceDeps {
   items: ItemLookup;
   isGameActive: () => boolean;
   storeMatchupNote: (myChampion: string, note: string, opponent?: string) => Promise<unknown>;
+  /** Saved matchup insights, most relevant first. */
+  searchMatchupNotes?: (myChampion: string, opponent: string) => Promise<string[]>;
+  /** Ability names for the briefing prompt, e.g. "Q Bloodlust, W Unstoppable, …". */
+  abilitiesOf?: (champion: string) => Promise<string | undefined>;
   clientFactory?: (key: string, region: string) => RiotApiClient;
   readKey?: () => string | undefined;
   now?: () => number;
@@ -129,6 +143,7 @@ export class AnalysisService {
   private llm: LlmProvider | null = null;
   private syncing = false;
   private goalUpdating = false;
+  private briefing?: MatchupBriefing;
   private readonly aggregator: BenchmarkAggregator;
   private readonly now: () => number;
 
@@ -238,7 +253,43 @@ export class AnalysisService {
   }
 
   /** Polls for the just-finished match until Riot publishes it. */
+  /** Briefing of the running game, if one was created. */
+  currentBriefing(): MatchupBriefing | undefined {
+    return this.briefing;
+  }
+
+  /**
+   * Builds the pre-lane briefing: two matchup facts from the LLM (when a
+   * provider is configured) and one line from the player's own history.
+   */
+  async createBriefing(state: ParsedGameState, opponentChampion: string | undefined): Promise<MatchupBriefing | undefined> {
+    if (!opponentChampion) return undefined;
+    const me = state.localPlayer.championName;
+    const role = state.localPlayer.position || "UNKNOWN";
+    const [notes, myAbilities, oppAbilities] = await Promise.all([
+      this.deps.searchMatchupNotes?.(me, opponentChampion).catch(() => []) ?? Promise.resolve([]),
+      this.deps.abilitiesOf?.(me).catch(() => undefined),
+      this.deps.abilitiesOf?.(opponentChampion).catch(() => undefined),
+    ]);
+    const llmReply = await this.complete(
+      BRIEFING_SYSTEM,
+      briefingPrompt({
+        myChampion: me,
+        myAbilities,
+        opponentChampion,
+        opponentAbilities: oppAbilities,
+        role,
+        rank: this.rank ? `${this.rank.tier} ${this.rank.division}` : undefined,
+      }),
+      200,
+    );
+    const history = historyPoint(lastMatchInMatchup(this.matches, me, opponentChampion), opponentChampion, notes[0]);
+    this.briefing = assembleBriefing(me, opponentChampion, role, parseBriefingReply(llmReply), history, this.now());
+    return this.briefing;
+  }
+
   onGameEnded(): void {
+    this.briefing = undefined;
     if (!this.config.riotId) return;
     const knownNewest = this.matches[0]?.matchId;
     this.setSync("waiting_for_match", "Waiting for Riot to publish the match");
