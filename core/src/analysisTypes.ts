@@ -160,6 +160,22 @@ export interface AnalysisSnapshot {
   keyProblem?: "missing" | "invalid_or_expired";
 }
 
+/** One line of the pre-lane matchup briefing. */
+export interface BriefingPoint {
+  /** trading / spike come from the LLM; history is built from stored numbers. */
+  kind: "trading" | "spike" | "history";
+  text: string;
+}
+
+/** Shown in the live view at game start, for the player's lane matchup. */
+export interface MatchupBriefing {
+  myChampion: string;
+  opponentChampion: string;
+  role: string;
+  points: BriefingPoint[];
+  createdAt: number;
+}
+
 /**
  * WebSocket events
  *
@@ -171,6 +187,8 @@ export interface AnalysisSnapshot {
  *
  * Core → app:
  *   { event: "ANALYSIS_UPDATE", analysis: AnalysisSnapshot }
+ *   { event: "MATCHUP_BRIEFING", briefing: MatchupBriefing }   at game start, and on
+ *     GET_ANALYSIS while a game with a briefing is running
  *   { event: "ANALYSIS_ANSWER", requestId: string, answer?: string, error?: string }
  */
 export interface AnalysisAnswer {

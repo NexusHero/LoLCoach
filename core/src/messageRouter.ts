@@ -47,6 +47,8 @@ export class MessageRouter {
   private handleGetAnalysis: MessageHandler = (ws) => {
     if (!this.analysis) return;
     ws.send(JSON.stringify({ event: "ANALYSIS_UPDATE", timestamp: Date.now(), analysis: this.analysis.snapshot() }));
+    const briefing = this.analysis.currentBriefing();
+    if (briefing) ws.send(JSON.stringify({ event: "MATCHUP_BRIEFING", timestamp: Date.now(), briefing }));
   };
 
   private handleRefreshAnalysis: MessageHandler = async () => {

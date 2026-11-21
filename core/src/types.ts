@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AnalysisSnapshot } from "./analysisTypes.js";
+import type { AnalysisSnapshot, MatchupBriefing } from "./analysisTypes.js";
 
 // --- Riot Live Client API Schemas ---
 
@@ -313,6 +313,7 @@ export interface WsMessage {
   sessionInputTokens?: number;
   budget?: number;
   analysis?: AnalysisSnapshot;
+  briefing?: MatchupBriefing;
 }
 
 export interface Strategy {
