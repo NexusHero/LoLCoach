@@ -51,6 +51,9 @@ describe("matchMetrics", () => {
     expect(review?.objectivesTotal).toBe(5);
     expect(review?.objectivesPresent).toBe(1);
     expect(review?.objectivePresence).toBeCloseTo(0.2);
+    expect(review?.objectiveEvents).toHaveLength(5);
+    expect(review?.objectiveEvents?.filter((e) => e.present)).toHaveLength(1);
+    expect(review?.objectiveEvents?.[0]).toMatchObject({ type: "DRAGON", time: 369, ownTeam: true });
   });
 
   it("computeMatchReview_RealGame_MinuteDiffsMatchHeadlineValues", () => {
@@ -64,6 +67,7 @@ describe("matchMetrics", () => {
     expect(review?.shopVisits.length).toBeGreaterThan(0);
     expect(review?.shopVisits[0]).toMatchObject({ time: 298, goldBefore: 1133 });
     expect(review?.shopVisits[0].itemsBought).toContain("Lost Chapter");
+    expect(review?.shopVisits[0].itemIds).toContain(3802);
   });
 
   it("computeMatchReview_UnknownPuuid_ReturnsUndefined", () => {

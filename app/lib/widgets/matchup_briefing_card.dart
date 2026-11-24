@@ -1,6 +1,7 @@
 import 'package:lol_coach/models/analysis.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
+import 'package:lol_coach/widgets/common/champ_avatar.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -36,6 +37,26 @@ class MatchupBriefingCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              ChampAvatar(
+                name: briefing.myChampion,
+                isDead: false,
+                size: 28,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  'vs',
+                  style: AppTextStyles.micro.copyWith(
+                    color: colors.textDisabled,
+                  ),
+                ),
+              ),
+              ChampAvatar(
+                name: briefing.opponentChampion,
+                isDead: false,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'MATCHUP BRIEFING · ${briefing.myChampion.toUpperCase()} '

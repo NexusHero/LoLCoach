@@ -53,9 +53,12 @@ class _RecommendationPanelState extends State<RecommendationPanel>
   @override
   void initState() {
     super.initState();
+    // Start at the end of the flash: at value 0 the overlay would sit on
+    // the card at full strength until the first new recommendation.
     _flash = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),
+      value: 1,
     );
     _syncTicker();
   }

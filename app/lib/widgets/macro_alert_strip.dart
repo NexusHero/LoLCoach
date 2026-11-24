@@ -221,7 +221,7 @@ class _EnemyCompMatrixChip extends StatelessWidget {
             'COMP ${profile.adPercent}% AD',
             style: AppTextStyles.mono.copyWith(
               color: colors.warning,
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -250,7 +250,7 @@ class _EnemyCompMatrixChip extends StatelessWidget {
             '${profile.apPercent}% AP',
             style: AppTextStyles.mono.copyWith(
               color: colors.magic,
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -334,7 +334,7 @@ class _ObjectiveTimerChip extends StatelessWidget {
             '${timer.label}: ${_fmtCountdown(timer.secondsUntilSpawn)}',
             style: AppTextStyles.mono.copyWith(
               color: color,
-              fontSize: 11,
+              fontSize: 12,
             ),
           ),
         ],

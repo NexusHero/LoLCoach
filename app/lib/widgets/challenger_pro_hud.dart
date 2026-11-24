@@ -7,6 +7,8 @@ import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/build_focus_selector.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
 import 'package:lol_coach/widgets/common/item_slot.dart';
+import 'package:lol_coach/widgets/recommendation/recommendation_item_rows.dart'
+    show buildPlanInnerSurface;
 import 'package:material_ui/material_ui.dart';
 
 /// Reduced glance HUD. Shows only what the app can state as fact and what
@@ -148,7 +150,7 @@ class _ProNextBuyBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: colors.goldSubtle,
+        color: buildPlanInnerSurface(colors),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: colors.champagneLine, width: 1.5),
       ),
@@ -174,7 +176,7 @@ class _ProNextBuyBox extends StatelessWidget {
                   Text(
                     buy.breakpointHint!,
                     style: AppTextStyles.mono.copyWith(
-                      color: colors.textPrimary,
+                      color: colors.textSecondary,
                       fontSize: 12,
                     ),
                   ),
@@ -198,7 +200,7 @@ class _ProItemTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: colors.surface2,
+        color: buildPlanInnerSurface(colors),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: item.isCore ? colors.magicLine : colors.border,

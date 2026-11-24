@@ -36,6 +36,10 @@ Map<String, dynamic> sampleMatch({
         for (var m = 1; m <= 15; m++)
           {'minute': m, 'gold': m * 30 - 100, 'xp': m * 15, 'cs': m - 5},
       ],
+      'objectiveEvents': [
+        {'time': 330, 'type': 'HORDE', 'ownTeam': true, 'present': true},
+        {'time': 610, 'type': 'DRAGON', 'ownTeam': false, 'present': false},
+      ],
       'firstCoreItemMinute': 13.5,
       'firstCoreItem': "Luden's Companion",
       'shopVisits': [
@@ -114,6 +118,11 @@ Map<String, dynamic> fullSnapshotJson() => {
         'message': 'Synced 3 games',
         'lastSyncAt': 1763400000000,
       },
+      'standings': [
+        {'tier': 'PLATINUM', 'metric': 'cs10', 'percentile': 68},
+        {'tier': 'MASTER', 'metric': 'cs10', 'percentile': 20},
+        {'tier': 'PLATINUM', 'metric': 'gold15', 'percentile': 90},
+      ],
       'aggregation': {
         'state': 'running',
         'tiers': [

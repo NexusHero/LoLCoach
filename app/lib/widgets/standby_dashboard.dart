@@ -344,7 +344,7 @@ class PostGameAutopsyCard extends StatelessWidget {
                 '${autopsy.championName} · ${autopsy.kda} · ${autopsy.csPerMin} CS/m',
                 style: AppTextStyles.mono.copyWith(
                   color: colors.textSecondary,
-                  fontSize: 11,
+                  fontSize: 12,
                 ),
               ),
             ],

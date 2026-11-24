@@ -6,14 +6,16 @@ import type {
   AnalysisSnapshot,
   Benchmark,
   MatchReview,
+  MetricKey,
   RankInfo,
+  Standing,
   SyncState,
   Tier,
   TrainingGoal,
 } from "./analysisTypes.js";
 import { TIERS } from "./analysisTypes.js";
 import type { AnalysisStore, AnalysisConfig, AnalysisState } from "./analysisStore.js";
-import { BenchmarkAggregator, toBenchmark } from "./benchmarkAggregator.js";
+import { BenchmarkAggregator, percentileOf, toBenchmark } from "./benchmarkAggregator.js";
 import {
   BLOCK_SIZE,
   CURRENT_LEVEL_WINDOW,
@@ -212,6 +214,23 @@ export class AnalysisService {
       .filter((b): b is Benchmark => b !== undefined);
   }
 
+  /** Percentiles of the player's recent main-role average within each collected tier. */
+  private standings(): Standing[] {
+    const role = mainRole(this.matches);
+    const patch = this.matches[0]?.patch;
+    const recent = this.matches.filter((m) => m.role === role).slice(0, CURRENT_LEVEL_WINDOW);
+    if (!role || !patch || recent.length === 0) return [];
+    const metrics: MetricKey[] = ["cs10", "earlyDeaths", "gold15", "objectivePresence"];
+    const result: Standing[] = [];
+    for (const a of this.state.aggregates.filter((x) => x.role === role && x.patch === patch)) {
+      for (const metric of metrics) {
+        const percentile = percentileOf(a.histograms?.[metric], metric, average(recent, metric));
+        if (percentile !== undefined) result.push({ tier: a.tier, metric, percentile });
+      }
+    }
+    return result;
+  }
+
   snapshot(): AnalysisSnapshot {
     const goal = this.state.goals[this.state.goals.length - 1];
     return {
@@ -221,6 +240,7 @@ export class AnalysisService {
       nextTier: nextTierOf(this.currentTier()),
       matches: this.matches.slice(0, MATCH_HISTORY_SIZE),
       benchmarks: this.benchmarks(),
+      standings: this.standings(),
       ...(goal ? { goal } : {}),
       ...(this.state.backfillSummary ? { backfillSummary: this.state.backfillSummary } : {}),
       sync: this.sync,

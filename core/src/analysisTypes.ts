@@ -46,12 +46,24 @@ export interface MinuteDiff {
   cs: number;
 }
 
+export interface ObjectiveEvent {
+  /** Game time in seconds. */
+  time: number;
+  /** DRAGON, BARON_NASHOR, RIFTHERALD, HORDE (voidgrubs), ATAKHAN */
+  type: string;
+  /** Did the player's team take it? */
+  ownTeam: boolean;
+  present: boolean;
+}
+
 export interface ShopVisit {
   /** Game time in seconds of the first purchase in the visit. */
   time: number;
   /** Gold the player held right before the visit (nearest minute frame). */
   goldBefore: number;
   itemsBought: string[];
+  /** Item ids parallel to itemsBought, for icons. */
+  itemIds?: number[];
 }
 
 export interface MatchReview {
@@ -81,12 +93,15 @@ export interface MatchReview {
   objectivePresence: number;
   objectivesTotal: number;
   objectivesPresent: number;
+  /** Epic objectives in time order, for markers on the minute curves. */
+  objectiveEvents?: ObjectiveEvent[];
 
   // Pro depth
   minuteDiffs: MinuteDiff[];
   /** Minute the first completed legendary item was bought, if any. */
   firstCoreItemMinute?: number;
   firstCoreItem?: string;
+  firstCoreItemId?: number;
   shopVisits: ShopVisit[];
 
   /** LLM-written review (3–5 sentences), absent for backfilled games. */
@@ -103,6 +118,16 @@ export interface Benchmark {
   earlyDeaths: number;
   gold15: number;
   objectivePresence: number;
+}
+
+/**
+ * Where the player's recent average lands within one tier's distribution:
+ * the share (0–100) of that tier's laners the player does better than.
+ */
+export interface Standing {
+  tier: Tier;
+  metric: MetricKey;
+  percentile: number;
 }
 
 export type GoalStatus = "active" | "achieved" | "repeat";
@@ -151,6 +176,8 @@ export interface AnalysisSnapshot {
   /** Newest first, at most 20. */
   matches: MatchReview[];
   benchmarks: Benchmark[];
+  /** Percentile per benchmark tier and metric, once enough samples exist. */
+  standings: Standing[];
   goal?: TrainingGoal;
   /** LLM summary over the backfilled games, if generated. */
   backfillSummary?: string;

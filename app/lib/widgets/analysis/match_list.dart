@@ -2,6 +2,7 @@ import 'package:lol_coach/models/analysis.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/analysis/analysis_common.dart';
+import 'package:lol_coach/widgets/common/champ_avatar.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Newest-first list of reviewed matches; tap a row to expand it.
@@ -105,8 +106,14 @@ class MatchRow extends StatelessWidget {
                               m.win ? 'WIN' : 'LOSS',
                               style: AppTextStyles.eyebrow.copyWith(
                                 color: accent,
-                                fontSize: 10,
+                                fontSize: 12,
                               ),
+                            ),
+                            const SizedBox(width: 8),
+                            ChampAvatar(
+                              name: m.champion,
+                              isDead: false,
+                              size: 26,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -119,6 +126,14 @@ class MatchRow extends StatelessWidget {
                                 style: AppTextStyles.bodyBold,
                               ),
                             ),
+                            if (m.opponentChampion != null) ...[
+                              const SizedBox(width: 6),
+                              ChampAvatar(
+                                name: m.opponentChampion!,
+                                isDead: false,
+                                size: 26,
+                              ),
+                            ],
                             Icon(
                               expanded ? Icons.expand_less : Icons.expand_more,
                               size: 18,

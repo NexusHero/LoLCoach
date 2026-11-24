@@ -69,9 +69,10 @@ class AppTextStyles {
     fontFeatures: _tabular,
   );
 
-  /// 11 — the rare, deliberate UPPERCASE label ("BUILD PLAN", "MATCHUP").
+  /// 12 — the rare, deliberate UPPERCASE label ("BUILD PLAN", "MATCHUP").
+  /// 12 px is the minimum text size anywhere in the app.
   static const eyebrow = TextStyle(
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: FontWeight.w700,
     letterSpacing: 1.5,
   );

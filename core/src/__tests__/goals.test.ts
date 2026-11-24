@@ -1,3 +1,4 @@
+import { addToHistogram, binIndex, emptyAggregate, percentileOf } from "../benchmarkAggregator";
 import type { Benchmark, MatchReview } from "../analysisTypes";
 import {
   blockPassed,
@@ -115,5 +116,33 @@ describe("goals", () => {
     expect(nextTierOf("UNRANKED")).toBe("PLATINUM");
     expect(aggregationTiers("PLATINUM")).toEqual(["EMERALD", "MASTER", "GRANDMASTER", "CHALLENGER"]);
     expect(aggregationTiers("MASTER")).toEqual(["GRANDMASTER", "MASTER", "CHALLENGER"]);
+  });
+});
+
+
+describe("benchmark histograms", () => {
+  it("binIndex_ValuesAtBinEdgesAndOutOfRange_AreClamped", () => {
+    expect(binIndex("objectivePresence", 0.3)).toBe(3);
+    expect(binIndex("cs10", -4)).toBe(0);
+    expect(binIndex("cs10", 999)).toBe(31);
+    expect(binIndex("gold15", 5_100)).toBe(12);
+  });
+
+  it("percentileOf_TooFewSamples_IsUndefined", () => {
+    const a = emptyAggregate("EMERALD", "MIDDLE", "16.22");
+    for (let i = 0; i < 49; i++) addToHistogram(a, "cs10", 70);
+    expect(percentileOf(a.histograms?.cs10, "cs10", 80)).toBeUndefined();
+  });
+
+  it("percentileOf_HigherIsBetterAndLowerIsBetter_CountsHalfOwnBin", () => {
+    const a = emptyAggregate("EMERALD", "MIDDLE", "16.22");
+    for (let i = 0; i < 50; i++) addToHistogram(a, "cs10", 60); // bin 12
+    for (let i = 0; i < 50; i++) addToHistogram(a, "cs10", 80); // bin 16
+    for (let d = 0; d < 4; d++) for (let i = 0; i < 25; i++) addToHistogram(a, "earlyDeaths", d);
+
+    expect(percentileOf(a.histograms?.cs10, "cs10", 70)).toBe(50);
+    expect(percentileOf(a.histograms?.cs10, "cs10", 82)).toBe(75);
+    expect(percentileOf(a.histograms?.earlyDeaths, "earlyDeaths", 0)).toBe(88);
+    expect(percentileOf(a.histograms?.earlyDeaths, "earlyDeaths", 3)).toBe(13);
   });
 });
