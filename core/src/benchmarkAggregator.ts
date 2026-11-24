@@ -73,6 +73,17 @@ export function emptyAggregate(tier: Tier, role: string, patch: string): TierAgg
   };
 }
 
+/**
+ * True when every metric's histogram holds exactly the aggregate's samples.
+ * Aggregates saved before histograms existed hold samples without them; the
+ * raw samples are not stored, so they cannot be backfilled.
+ */
+export function hasCompleteHistograms(a: TierAggregate): boolean {
+  return METRICS.every(
+    (m) => (a.histograms?.[m]?.reduce((sum, c) => sum + c, 0) ?? 0) === a.samples,
+  );
+}
+
 export function toBenchmark(a: TierAggregate): Benchmark | undefined {
   if (a.samples === 0) return undefined;
   const avg = (v: number) => v / a.samples;
@@ -124,11 +135,12 @@ export class BenchmarkAggregator {
     this.stopRequested = false;
     try {
       let aggregates = await this.deps.load();
-      aggregates = tiers.map(
-        (tier) =>
-          aggregates.find((a) => a.tier === tier && a.role === role && a.patch === patch) ??
-          emptyAggregate(tier, role, patch),
-      );
+      aggregates = tiers.map((tier) => {
+        const stored = aggregates.find((a) => a.tier === tier && a.role === role && a.patch === patch);
+        // Re-collect aggregates without matching histograms, so averages and
+        // percentiles always come from the same samples.
+        return stored && hasCompleteHistograms(stored) ? stored : emptyAggregate(tier, role, patch);
+      });
       this.report({ state: "running", patch, message: undefined }, aggregates);
 
       for (const aggregate of aggregates) {

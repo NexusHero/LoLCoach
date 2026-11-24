@@ -1,4 +1,4 @@
-import { addToHistogram, binIndex, emptyAggregate, percentileOf } from "../benchmarkAggregator";
+import { addToHistogram, binIndex, emptyAggregate, hasCompleteHistograms, percentileOf } from "../benchmarkAggregator";
 import type { Benchmark, MatchReview } from "../analysisTypes";
 import {
   blockPassed,
@@ -126,6 +126,15 @@ describe("benchmark histograms", () => {
     expect(binIndex("cs10", -4)).toBe(0);
     expect(binIndex("cs10", 999)).toBe(31);
     expect(binIndex("gold15", 5_100)).toBe(12);
+  });
+
+  it("hasCompleteHistograms_MissingOrPartialHistograms_IsFalse", () => {
+    const fresh = emptyAggregate("EMERALD", "MIDDLE", "16.22");
+    expect(hasCompleteHistograms(fresh)).toBe(true); // 0 samples, 0 counts
+
+    const partial = { ...emptyAggregate("EMERALD", "MIDDLE", "16.22"), samples: 10 };
+    addToHistogram(partial, "cs10", 70);
+    expect(hasCompleteHistograms(partial)).toBe(false);
   });
 
   it("percentileOf_TooFewSamples_IsUndefined", () => {

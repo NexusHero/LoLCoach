@@ -15,7 +15,7 @@ import type {
 } from "./analysisTypes.js";
 import { TIERS } from "./analysisTypes.js";
 import type { AnalysisStore, AnalysisConfig, AnalysisState } from "./analysisStore.js";
-import { BenchmarkAggregator, percentileOf, toBenchmark } from "./benchmarkAggregator.js";
+import { BenchmarkAggregator, hasCompleteHistograms, percentileOf, toBenchmark } from "./benchmarkAggregator.js";
 import {
   BLOCK_SIZE,
   CURRENT_LEVEL_WINDOW,
@@ -222,7 +222,10 @@ export class AnalysisService {
     if (!role || !patch || recent.length === 0) return [];
     const metrics: MetricKey[] = ["cs10", "earlyDeaths", "gold15", "objectivePresence"];
     const result: Standing[] = [];
-    for (const a of this.state.aggregates.filter((x) => x.role === role && x.patch === patch)) {
+    const usable = this.state.aggregates.filter(
+      (x) => x.role === role && x.patch === patch && hasCompleteHistograms(x),
+    );
+    for (const a of usable) {
       for (const metric of metrics) {
         const percentile = percentileOf(a.histograms?.[metric], metric, average(recent, metric));
         if (percentile !== undefined) result.push({ tier: a.tier, metric, percentile });
