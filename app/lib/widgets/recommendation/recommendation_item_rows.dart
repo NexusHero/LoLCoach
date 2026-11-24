@@ -6,6 +6,10 @@ import 'package:lol_coach/widgets/common/badge.dart';
 import 'package:lol_coach/widgets/common/item_slot.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// Darker solid fill for rows inside the (violet-glow) BUILD PLAN card.
+Color buildPlanInnerSurface(AppColors colors) =>
+    colors.surfaceMedium.withValues(alpha: 0.78);
+
 /// The headline item, rendered in a tinted rounded row with a subtle glow.
 class HeroRecommendationItem extends StatelessWidget {
   const HeroRecommendationItem({
@@ -25,16 +29,9 @@ class HeroRecommendationItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isLlm
-              ? [
-                  colors.magicSubtle,
-                  colors.magicSubtle.withValues(alpha: 0.04),
-                ]
-              : [colors.surface2, colors.surface2],
-        ),
+        // Solid darker inner surface so secondary text is not violet on
+        // violet inside the glowing BUILD PLAN card.
+        color: buildPlanInnerSurface(colors),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isLlm ? colors.magicLine : colors.border,
@@ -98,7 +95,7 @@ class SecondaryRecommendationItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: colors.surface2,
+          color: buildPlanInnerSurface(colors),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: colors.hairlineSoft),
         ),
@@ -117,7 +114,7 @@ class SecondaryRecommendationItem extends StatelessWidget {
                 '$stepIndex',
                 style: AppTextStyles.micro.copyWith(
                   color: accentColor,
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -160,7 +157,7 @@ class NextBestBuyBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: colors.goldSubtle,
+        color: buildPlanInnerSurface(colors),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colors.champagneLine),
       ),

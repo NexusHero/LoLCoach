@@ -18,12 +18,6 @@ class AnalysisHeader extends StatelessWidget {
   final VoidCallback? onRefresh;
   final bool refreshing;
 
-  String _rankLine(RankInfo? r) {
-    if (r == null || !r.isRanked) return 'Unranked';
-    final div = r.division.isNotEmpty ? ' ${r.division}' : '';
-    return '${r.tier}$div · ${r.leaguePoints} LP · ${r.wins}W ${r.losses}L';
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -58,10 +52,8 @@ class AnalysisHeader extends StatelessWidget {
                       style: AppTextStyles.title,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      _rankLine(snapshot.rank),
-                      style: AppTextStyles.mono.copyWith(color: colors.gold),
-                    ),
+                    const SizedBox(height: 2),
+                    _RankLine(snapshot: snapshot),
                   ],
                 ),
               ),
@@ -100,6 +92,81 @@ class AnalysisHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Tier badge, W/L record, current streak and last-10 form dots.
+class _RankLine extends StatelessWidget {
+  const _RankLine({required this.snapshot});
+  final AnalysisSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final r = snapshot.rank;
+    final streak = snapshot.streak;
+    final form = snapshot.recentForm();
+    final detail = <String>[
+      if (r != null && r.division.isNotEmpty) r.division,
+    ].join();
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (r == null || !r.isRanked)
+          const TierBadge(tier: 'UNRANKED')
+        else
+          TierBadge(
+            tier: r.tier,
+            detail: '${detail.isEmpty ? '' : '$detail · '}'
+                '${r.leaguePoints} LP',
+          ),
+        if (r != null && r.isRanked)
+          Text(
+            '${r.wins}W ${r.losses}L',
+            style: AppTextStyles.mono.copyWith(color: colors.textSecondary),
+          ),
+        if (streak != 0)
+          Container(
+            key: const ValueKey('streakBadge'),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: (streak > 0 ? colors.success : colors.errorLight)
+                  .withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              streak > 0 ? 'W$streak' : 'L${-streak}',
+              style: AppTextStyles.mono.copyWith(
+                fontSize: 12,
+                color: streak > 0 ? colors.success : colors.errorLight,
+              ),
+            ),
+          ),
+        if (form.isNotEmpty)
+          Semantics(
+            label: 'Last ${form.length} games: '
+                '${form.where((w) => w).length} wins',
+            child: Row(
+              key: const ValueKey('formDots'),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < form.length; i++)
+                  Container(
+                    width: 7,
+                    height: 7,
+                    margin: const EdgeInsets.only(right: 3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: form[i] ? colors.success : colors.errorLight,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

@@ -32,7 +32,7 @@ class ItemSlot extends StatelessWidget {
           displayName.isNotEmpty ? displayName[0] : '?',
           style: TextStyle(
             color: colors.gold,
-            fontSize: 9,
+            fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
         ),

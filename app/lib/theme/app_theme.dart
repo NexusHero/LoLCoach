@@ -98,12 +98,12 @@ class AppTheme {
         unselectedIconTheme: IconThemeData(color: c.textSecondary),
         selectedLabelTextStyle: TextStyle(
           color: c.magic,
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
         unselectedLabelTextStyle: TextStyle(
           color: c.textSecondary,
-          fontSize: 11,
+          fontSize: 12,
         ),
         useIndicator: true,
         indicatorColor: c.magicSubtle,

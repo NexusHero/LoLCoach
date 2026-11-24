@@ -1,6 +1,7 @@
 import 'package:lol_coach/models/analysis.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
+import 'package:lol_coach/widgets/analysis/analysis_common.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -59,6 +60,10 @@ class MetricTile extends StatelessWidget {
       _ => null,
     };
     final diffAvg = diffMetric == null ? null : snapshot.average(diffMetric);
+    final standings = [
+      for (final tier in {snapshot.nextTier, 'MASTER'})
+        if (snapshot.standingFor(tier, metric) case final st?) st,
+    ];
 
     return GameCard(
       key: ValueKey('metricTile_${metric.key}'),
@@ -69,11 +74,11 @@ class MetricTile extends StatelessWidget {
         children: [
           Text(
             metric.label,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: AppTextStyles.eyebrow.copyWith(
               color: colors.textDisabled,
-              fontSize: 10,
+              fontSize: 12,
             ),
           ),
           const SizedBox(height: 6),
@@ -95,7 +100,7 @@ class MetricTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: AppTextStyles.micro.copyWith(
-                fontSize: 11,
+                fontSize: 12,
                 color: diffAvg > 0
                     ? colors.success
                     : diffAvg < 0
@@ -111,7 +116,7 @@ class MetricTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: AppTextStyles.micro.copyWith(
-                fontSize: 11,
+                fontSize: 12,
                 color: colors.textDisabled,
               ),
             ),
@@ -123,6 +128,16 @@ class MetricTile extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           _BenchRow(label: 'MASTER', bench: master, metric: metric),
+          if (standings.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                for (final st in standings) StandingBadge(standing: st),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -146,11 +161,13 @@ class _BenchRow extends StatelessWidget {
     final value = bench == null ? null : metric.benchmarkOf(bench!);
     final style = AppTextStyles.micro.copyWith(
       color: colors.textSecondary,
-      fontSize: 11,
+      fontSize: 12,
     );
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(
+        Flexible(
+          flex: 3,
           child: Text(
             label,
             maxLines: 1,
@@ -158,10 +175,19 @@ class _BenchRow extends StatelessWidget {
             style: style,
           ),
         ),
-        Text(
-          value == null ? 'collecting…' : metric.format(value),
-          style: style.copyWith(
-            color: value == null ? colors.textDisabled : colors.textPrimary,
+        const SizedBox(width: 6),
+        Flexible(
+          flex: 2,
+          child: Text(
+            // An en dash keeps narrow tiles readable; the benchmark card shows
+            // the collection progress.
+            value == null ? '–' : metric.format(value),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: style.copyWith(
+              color: value == null ? colors.textDisabled : colors.textPrimary,
+            ),
           ),
         ),
       ],

@@ -73,7 +73,7 @@ class AppBadge extends StatelessWidget {
         text,
         style: TextStyle(
           color: r.fg,
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.3,
         ),

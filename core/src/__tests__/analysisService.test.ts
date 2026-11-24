@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { AnalysisSnapshot } from "../analysisTypes";
 import { AnalysisStore } from "../analysisStore";
 import { AnalysisService } from "../analysisService";
-import { BenchmarkAggregator, SAMPLES_PER_TIER, toBenchmark } from "../benchmarkAggregator";
+import { BenchmarkAggregator, SAMPLES_PER_TIER, hasCompleteHistograms, toBenchmark } from "../benchmarkAggregator";
 import type { LlmProvider } from "../llmProvider";
 import { RateLimiter, RiotApiError, type RiotApiClient, type RiotMatch, type RiotTimeline } from "../riotApi";
 import type { TierAggregate } from "../analysisStore";
@@ -224,6 +224,38 @@ describe("BenchmarkAggregator", () => {
     expect(benchmark?.cs10).toBe((95 + 73) / 2); // Malzahar and Hwei at 10:00
     expect(aggregator.getProgress().state).toBe("done");
     expect(aggregator.getProgress().tiers[0]).toEqual({ tier: "MASTER", samples: 2, target: SAMPLES_PER_TIER });
+  });
+
+  it("run_StoredAggregateWithoutHistograms_IsRecollectedFromScratch", async () => {
+    let saved: TierAggregate[] = [];
+    const legacy: TierAggregate = {
+      tier: "MASTER",
+      role: "MIDDLE",
+      patch: "16.22",
+      samples: 300,
+      sums: { cs10: 24_000, earlyDeaths: 300, gold15: 1_500_000, objectivePresence: 150 },
+      seenMatchIds: ["EUW1_100"],
+      playerCursor: 150,
+      ladderPage: 1,
+    };
+    const client = fakeClient([], {
+      ladderPuuids: async () => ["p1"],
+      matchIdsByPuuid: async () => ["EUW1_100"],
+    });
+    const aggregator = new BenchmarkAggregator({
+      client: () => client,
+      isGameActive: () => false,
+      load: async () => [legacy],
+      save: async (a) => {
+        saved = a;
+      },
+      onProgress: () => {},
+    });
+
+    await aggregator.run(["MASTER"], "MIDDLE", "16.22");
+
+    expect(saved[0].samples).toBe(2);
+    expect(hasCompleteHistograms(saved[0])).toBe(true);
   });
 
   it("run_OtherPatch_SkipsMatches", async () => {

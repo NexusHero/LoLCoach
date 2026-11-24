@@ -59,7 +59,7 @@ class StatChip extends StatelessWidget {
           Text(
             label,
             style: AppTextStyles.eyebrow.copyWith(
-              fontSize: 10,
+              fontSize: 12,
               letterSpacing: 1.1,
               color: colors.textSecondary,
             ),

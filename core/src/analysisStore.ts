@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import type { MatchReview, Tier, TrainingGoal } from "./analysisTypes.js";
+import type { MatchReview, MetricKey, Tier, TrainingGoal } from "./analysisTypes.js";
 
 export const ANALYSIS_DIR =
   process.env.NODE_ENV === "test"
@@ -21,6 +21,8 @@ export interface TierAggregate {
   patch: string;
   samples: number;
   sums: { cs10: number; earlyDeaths: number; gold15: number; objectivePresence: number };
+  /** Fixed-bin histograms per metric (see HISTOGRAM_BINS); absent in aggregates from older versions. */
+  histograms?: Partial<Record<MetricKey, number[]>>;
   /** Matches already counted, so a restart never counts a game twice. */
   seenMatchIds: string[];
   /** Index of the next ladder player to sample. */

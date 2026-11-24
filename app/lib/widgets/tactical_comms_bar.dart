@@ -22,6 +22,7 @@ class TacticalCommsBar extends StatefulWidget {
     this.onClearOverride,
     this.voiceEnabled = false,
     this.onVoiceToggled,
+    this.initiallyExpanded = false,
   });
 
   final ParsedGameState? gameState;
@@ -32,12 +33,16 @@ class TacticalCommsBar extends StatefulWidget {
   final bool voiceEnabled;
   final ValueChanged<bool>? onVoiceToggled;
 
+  /// Collapsed (default) = one compact row: Marker pill + expand chevron.
+  final bool initiallyExpanded;
+
   @override
   State<TacticalCommsBar> createState() => _TacticalCommsBarState();
 }
 
 class _TacticalCommsBarState extends State<TacticalCommsBar> {
   final TextEditingController _controller = TextEditingController();
+  late bool _expanded = widget.initiallyExpanded;
 
   @override
   void dispose() {
@@ -96,99 +101,150 @@ class _TacticalCommsBarState extends State<TacticalCommsBar> {
             ),
             const SizedBox(height: 10),
           ],
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _VoiceToggleButton(
-                enabled: widget.voiceEnabled,
-                onTap: () => widget.onVoiceToggled?.call(!widget.voiceEnabled),
-              ),
-              _QuickCalloutPill(
-                icon: Icons.bookmark_add_outlined,
-                label: 'Marker',
-                hotkey: 'F1',
-                accent: colors.gold,
-                onTap: () => widget.onSendCommand('Marker'),
-              ),
-              _QuickCalloutPill(
-                icon: Icons.shield_outlined,
-                label: 'Camped',
-                hotkey: 'F3',
-                accent: colors.errorLight,
-                onTap: () => widget.onSendCommand('Ich werde gecampt'),
-              ),
-              if (swapTarget != null)
+          if (!_expanded)
+            Row(
+              children: [
                 _QuickCalloutPill(
-                  icon: Icons.swap_horiz_rounded,
-                  label: 'Swap → $swapTarget',
-                  hotkey: 'F4',
-                  accent: colors.magic,
-                  onTap: () => widget.onSendCommand('Swap $swapTarget'),
+                  icon: Icons.bookmark_add_outlined,
+                  label: 'Marker',
+                  hotkey: 'F1',
+                  accent: colors.gold,
+                  onTap: () => widget.onSendCommand('Marker'),
                 ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 36,
-                  child: TextField(
-                    controller: _controller,
-                    onSubmitted: (_) => _submit(),
-                    style: AppTextStyles.caption.copyWith(
-                      color: colors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText:
-                          'Marker or command (e.g. "Marker: bad trade", "Kaisa AP", "Merk dir: ...")',
-                      hintStyle: AppTextStyles.caption.copyWith(
-                        color: colors.textDisabled,
-                      ),
-                      filled: true,
-                      fillColor: colors.surface2,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      border: border,
-                      enabledBorder: border,
-                      focusedBorder: border.copyWith(
-                        borderSide: BorderSide(color: colors.magic),
-                      ),
-                    ),
+                const Spacer(),
+                _ExpandToggle(
+                  expanded: false,
+                  onTap: () => setState(() => _expanded = true),
+                ),
+              ],
+            )
+          else ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _VoiceToggleButton(
+                  enabled: widget.voiceEnabled,
+                  onTap: () =>
+                      widget.onVoiceToggled?.call(!widget.voiceEnabled),
+                ),
+                _QuickCalloutPill(
+                  icon: Icons.bookmark_add_outlined,
+                  label: 'Marker',
+                  hotkey: 'F1',
+                  accent: colors.gold,
+                  onTap: () => widget.onSendCommand('Marker'),
+                ),
+                _QuickCalloutPill(
+                  icon: Icons.shield_outlined,
+                  label: 'Camped',
+                  hotkey: 'F3',
+                  accent: colors.errorLight,
+                  onTap: () => widget.onSendCommand('Ich werde gecampt'),
+                ),
+                if (swapTarget != null)
+                  _QuickCalloutPill(
+                    icon: Icons.swap_horiz_rounded,
+                    label: 'Swap → $swapTarget',
+                    hotkey: 'F4',
+                    accent: colors.magic,
+                    onTap: () => widget.onSendCommand('Swap $swapTarget'),
                   ),
+                _ExpandToggle(
+                  expanded: true,
+                  onTap: () => setState(() => _expanded = false),
                 ),
-              ),
-              const SizedBox(width: 8),
-              MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  onTap: _submit,
-                  child: Container(
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
                     height: 36,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: colors.magicSubtle,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: colors.magicLine),
-                    ),
-                    child: Text(
-                      'SEND',
-                      style: AppTextStyles.micro.copyWith(
-                        color: colors.magic,
-                        fontWeight: FontWeight.w800,
+                    child: TextField(
+                      controller: _controller,
+                      onSubmitted: (_) => _submit(),
+                      style: AppTextStyles.caption.copyWith(
+                        color: colors.textPrimary,
+                      ),
+                      decoration: InputDecoration(
+                        hintText:
+                            'Marker or command (e.g. "Marker: bad trade", "Kaisa AP", "Merk dir: ...")',
+                        hintStyle: AppTextStyles.caption.copyWith(
+                          color: colors.textDisabled,
+                        ),
+                        filled: true,
+                        fillColor: colors.surface2,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        border: border,
+                        enabledBorder: border,
+                        focusedBorder: border.copyWith(
+                          borderSide: BorderSide(color: colors.magic),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 8),
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: _submit,
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: colors.magicSubtle,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: colors.magicLine),
+                      ),
+                      child: Text(
+                        'SEND',
+                        style: AppTextStyles.micro.copyWith(
+                          color: colors.magic,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _ExpandToggle extends StatelessWidget {
+  const _ExpandToggle({required this.expanded, required this.onTap});
+  final bool expanded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Tooltip(
+      message: expanded ? 'Hide comms' : 'Show comms',
+      child: InkWell(
+        key: const ValueKey('commsExpandToggle'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(
+            expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+            size: 20,
+            color: colors.textSecondary,
+          ),
+        ),
       ),
     );
   }
@@ -215,13 +271,25 @@ class _RadioReplyBanner extends StatelessWidget {
             children: [
               Icon(Icons.headset_mic_rounded, size: 14, color: colors.magic),
               const SizedBox(width: 6),
-              Text('COACH', style: AppTextStyles.micro.copyWith(color: colors.magic, fontWeight: FontWeight.w800)),
+              Text(
+                'COACH',
+                style: AppTextStyles.micro.copyWith(
+                  color: colors.magic,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
               const Spacer(),
-              Text('"${exchange.userText}"', style: AppTextStyles.micro.copyWith(color: colors.textDisabled)),
+              Text(
+                '"${exchange.userText}"',
+                style: AppTextStyles.micro.copyWith(color: colors.textDisabled),
+              ),
             ],
           ),
           const SizedBox(height: 5),
-          Text(exchange.replyText, style: AppTextStyles.bodyBold.copyWith(color: colors.textPrimary)),
+          Text(
+            exchange.replyText,
+            style: AppTextStyles.bodyBold.copyWith(color: colors.textPrimary),
+          ),
           if (exchange.actionsExecuted.isNotEmpty) ...[
             const SizedBox(height: 6),
             Wrap(
@@ -230,13 +298,21 @@ class _RadioReplyBanner extends StatelessWidget {
               children: [
                 for (final act in exchange.actionsExecuted)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: colors.cyan.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: colors.cyan.withValues(alpha: 0.4)),
+                      border:
+                          Border.all(color: colors.cyan.withValues(alpha: 0.4)),
                     ),
-                    child: Text(act, style: AppTextStyles.micro.copyWith(color: colors.cyan, fontWeight: FontWeight.w700)),
+                    child: Text(
+                      act,
+                      style: AppTextStyles.micro.copyWith(
+                        color: colors.cyan,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -373,7 +449,11 @@ class _QuickCalloutPill extends StatelessWidget {
               ),
               if (hotkey != null) ...[
                 const SizedBox(width: 4),
-                Text('[$hotkey]', style: AppTextStyles.micro.copyWith(color: colors.textDisabled, fontSize: 9)),
+                Text(
+                  '[$hotkey]',
+                  style: AppTextStyles.micro
+                      .copyWith(color: colors.textDisabled, fontSize: 12),
+                ),
               ],
             ],
           ),

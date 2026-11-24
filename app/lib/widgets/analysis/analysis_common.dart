@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:lol_coach/models/analysis.dart';
 import 'package:lol_coach/theme/app_colors.dart';
 import 'package:lol_coach/theme/app_text_styles.dart';
 import 'package:lol_coach/widgets/common/game_card.dart';
@@ -182,5 +185,183 @@ void drawDashedLine(
     final b = start + dir * (d + dash).clamp(0, total);
     canvas.drawLine(a, b, paint);
     d += dash + gap;
+  }
+}
+
+/// Fixed tier colours (no external emblem images).
+Color tierColor(String tier) => switch (tier) {
+      'IRON' => const Color(0xFF8C8C8C),
+      'BRONZE' => const Color(0xFFB0794F),
+      'SILVER' => const Color(0xFFAEB8C2),
+      'GOLD' => const Color(0xFFE1B85C),
+      'PLATINUM' => const Color(0xFF4FB6A8),
+      'EMERALD' => const Color(0xFF3CC37A),
+      'DIAMOND' => const Color(0xFF6C9CF0),
+      'MASTER' => const Color(0xFFB57BEA),
+      'GRANDMASTER' => const Color(0xFFE5605B),
+      'CHALLENGER' => const Color(0xFF7FD3F0),
+      _ => const Color(0xFF8C8C8C),
+    };
+
+/// Styled rank pill: "GOLD II · 45 LP" in the tier colour.
+class TierBadge extends StatelessWidget {
+  const TierBadge({required this.tier, this.detail, super.key});
+  final String tier;
+  final String? detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = tierColor(tier);
+    return Container(
+      key: const ValueKey('tierBadge'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: c.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.shield_rounded, size: 13, color: c),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              detail == null ? tier : '$tier $detail',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.mono.copyWith(
+                color: c,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact percentile badge: "Top 32% · EMERALD".
+class StandingBadge extends StatelessWidget {
+  const StandingBadge({required this.standing, super.key});
+  final Standing standing;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final p = standing.percentile;
+    final color = p >= 75
+        ? colors.success
+        : p >= 50
+            ? colors.gold
+            : colors.errorLight;
+    return Container(
+      key: ValueKey('standing_${standing.tier}_${standing.metric}'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        '${standing.label} · ${standing.tier}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.micro.copyWith(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// "Ahri vs Zed" (or just the champion).
+String matchTitle(MatchReview m) => m.opponentChampion == null
+    ? m.champion
+    : '${m.champion} vs ${m.opponentChampion}';
+
+/// Positioned value label used by the chart tooltips.
+class ChartValueLabel extends StatelessWidget {
+  const ChartValueLabel({
+    required this.left,
+    required this.top,
+    required this.width,
+    required this.text,
+    required this.color,
+    super.key,
+  });
+
+  final double left;
+  final double top;
+  final double width;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Positioned(
+      left: left,
+      top: top,
+      width: width,
+      child: IgnorePointer(
+        child: Center(
+          child: Container(
+            key: const ValueKey('chartTooltip'),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: colors.surfaceMedium,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withValues(alpha: 0.6)),
+            ),
+            child: Text(
+              text,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.micro.copyWith(
+                color: colors.textPrimary,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Floating value label above a chart point. Shared with the minute curves.
+class ChartTooltip extends StatelessWidget {
+  const ChartTooltip({
+    super.key,
+    required this.anchor,
+    required this.chartWidth,
+    required this.text,
+    required this.color,
+  });
+
+  final Offset anchor;
+  final double chartWidth;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    const w = 200.0;
+    final maxW = math.min(w, chartWidth);
+    final left = (anchor.dx - maxW / 2).clamp(0, chartWidth - maxW).toDouble();
+    final top = math.max(0, anchor.dy - 34).toDouble();
+    return ChartValueLabel(
+      left: left,
+      top: top,
+      width: maxW,
+      text: text,
+      color: color,
+    );
   }
 }

@@ -1,4 +1,5 @@
-import type { AggregationProgress, Benchmark, Tier } from "./analysisTypes.js";
+import type { AggregationProgress, Benchmark, MetricKey, Tier } from "./analysisTypes.js";
+import { LOWER_IS_BETTER } from "./analysisTypes.js";
 import type { TierAggregate } from "./analysisStore.js";
 import { computeLaneSample, isRemake, patchOf } from "./matchMetrics.js";
 import { RiotApiError, type RiotApiClient } from "./riotApi.js";
@@ -9,6 +10,45 @@ export const SAMPLES_PER_TIER = 300;
 /** Recent games sampled per ladder player, so a few players do not dominate. */
 const MATCHES_PER_PLAYER = 3;
 const MAX_SEEN_IDS = 2_000;
+
+/** Samples a histogram needs before percentiles are shown. */
+export const MIN_STANDING_SAMPLES = 50;
+
+/** Fixed bins per metric: values are clamped into [start, start + size * count). */
+export const HISTOGRAM_BINS: Record<MetricKey, { start: number; size: number; count: number }> = {
+  cs10: { start: 0, size: 5, count: 32 },
+  earlyDeaths: { start: 0, size: 1, count: 7 },
+  gold15: { start: 2_000, size: 250, count: 30 },
+  objectivePresence: { start: 0, size: 0.1, count: 11 },
+};
+
+const METRICS = Object.keys(HISTOGRAM_BINS) as MetricKey[];
+
+export function binIndex(metric: MetricKey, value: number): number {
+  const bins = HISTOGRAM_BINS[metric];
+  // The epsilon keeps values like 0.3 / 0.1 from landing one bin low.
+  const raw = Math.floor((value - bins.start) / bins.size + 1e-9);
+  return Math.max(0, Math.min(bins.count - 1, raw));
+}
+
+export function addToHistogram(aggregate: TierAggregate, metric: MetricKey, value: number): void {
+  const histograms = (aggregate.histograms ??= {});
+  const counts = (histograms[metric] ??= new Array<number>(HISTOGRAM_BINS[metric].count).fill(0));
+  counts[binIndex(metric, value)] += 1;
+}
+
+/**
+ * Share (0–100) of the tier's samples the value does better than, counting
+ * half of its own bin. Undefined until the histogram has enough samples.
+ */
+export function percentileOf(counts: number[] | undefined, metric: MetricKey, value: number): number | undefined {
+  const total = counts?.reduce((a, b) => a + b, 0) ?? 0;
+  if (!counts || total < MIN_STANDING_SAMPLES) return undefined;
+  const idx = binIndex(metric, value);
+  const below = counts.slice(0, idx).reduce((a, b) => a + b, 0);
+  const share = (below + counts[idx] / 2) / total;
+  return Math.round((LOWER_IS_BETTER.has(metric) ? 1 - share : share) * 100);
+}
 
 export interface AggregatorDeps {
   client: () => RiotApiClient | undefined;
@@ -31,6 +71,17 @@ export function emptyAggregate(tier: Tier, role: string, patch: string): TierAgg
     playerCursor: 0,
     ladderPage: 1,
   };
+}
+
+/**
+ * True when every metric's histogram holds exactly the aggregate's samples.
+ * Aggregates saved before histograms existed hold samples without them; the
+ * raw samples are not stored, so they cannot be backfilled.
+ */
+export function hasCompleteHistograms(a: TierAggregate): boolean {
+  return METRICS.every(
+    (m) => (a.histograms?.[m]?.reduce((sum, c) => sum + c, 0) ?? 0) === a.samples,
+  );
 }
 
 export function toBenchmark(a: TierAggregate): Benchmark | undefined {
@@ -84,11 +135,12 @@ export class BenchmarkAggregator {
     this.stopRequested = false;
     try {
       let aggregates = await this.deps.load();
-      aggregates = tiers.map(
-        (tier) =>
-          aggregates.find((a) => a.tier === tier && a.role === role && a.patch === patch) ??
-          emptyAggregate(tier, role, patch),
-      );
+      aggregates = tiers.map((tier) => {
+        const stored = aggregates.find((a) => a.tier === tier && a.role === role && a.patch === patch);
+        // Re-collect aggregates without matching histograms, so averages and
+        // percentiles always come from the same samples.
+        return stored && hasCompleteHistograms(stored) ? stored : emptyAggregate(tier, role, patch);
+      });
       this.report({ state: "running", patch, message: undefined }, aggregates);
 
       for (const aggregate of aggregates) {
@@ -153,6 +205,7 @@ export class BenchmarkAggregator {
         aggregate.sums.earlyDeaths += sample.earlyDeaths;
         aggregate.sums.gold15 += sample.gold15;
         aggregate.sums.objectivePresence += sample.objectivePresence;
+        for (const metric of METRICS) addToHistogram(aggregate, metric, sample[metric]);
       }
     }
     return true;

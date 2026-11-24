@@ -2,11 +2,13 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lol_coach/models/analysis.dart';
 import 'package:lol_coach/providers.dart';
 import 'package:lol_coach/screens/analysis_screen.dart';
 import 'package:lol_coach/services/analysis_service.dart';
 import 'package:lol_coach/services/ws_client.dart';
 import 'package:lol_coach/theme/app_theme.dart';
+import 'package:lol_coach/widgets/analysis/analysis_common.dart';
 import 'package:lol_coach/widgets/analysis/analysis_header.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -77,7 +79,8 @@ void main() {
       await _pumpScreen(tester, snapshot: fullSnapshotJson());
 
       expect(find.text('Tester#EUW'), findsOneWidget);
-      expect(find.text('GOLD II · 45 LP · 30W 25L'), findsOneWidget);
+      expect(find.text('GOLD II · 45 LP'), findsOneWidget);
+      expect(find.text('30W 25L'), findsOneWidget);
       expect(
         find.text('No deaths before 14:00 in your next 5 games.'),
         findsOneWidget,
@@ -98,7 +101,7 @@ void main() {
         expect(find.byKey(ValueKey('metricTile_$key')), findsOneWidget);
       }
       // MASTER benchmark is missing in the fixture.
-      expect(find.text('collecting…'), findsNWidgets(4));
+      expect(find.text('–'), findsNWidgets(4));
       // Headline is the absolute value, beating the PLATINUM benchmark.
       expect(find.text('82'), findsOneWidget);
       expect(find.text('5400'), findsOneWidget);
@@ -214,6 +217,98 @@ void main() {
       await tester.pump();
       expect(find.text('Thinking…'), findsNothing);
       expect(find.text('You trade before level 6.'), findsOneWidget);
+    });
+  });
+
+  group('AnalysisScreen polish', () {
+    testWidgets('metric tiles show standing badges', (tester) async {
+      await _pumpScreen(tester, snapshot: fullSnapshotJson());
+      expect(find.text('Top 32% · PLATINUM'), findsOneWidget);
+      expect(find.text('Bottom 20% · MASTER'), findsOneWidget);
+      expect(find.text('Top 10% · PLATINUM'), findsOneWidget);
+      // No standings for the other two tiles.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('metricTile_earlyDeaths')),
+          matching: find.byType(StandingBadge),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('header shows streak and last-10 form', (tester) async {
+      final json = fullSnapshotJson();
+      // Newest first: W W L → streak W2.
+      (json['matches'] as List)[1] = sampleMatch(
+        id: 'EUW1_2',
+        win: true,
+        gameStart: 1763300000000,
+      );
+      (json['matches'] as List)[2] = sampleMatch(
+        id: 'EUW1_1',
+        win: false,
+        gameStart: 1763200000000,
+      );
+      await _pumpScreen(tester, snapshot: json);
+      expect(find.text('W2'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tierBadge')), findsOneWidget);
+      expect(find.bySemanticsLabel('Last 3 games: 2 wins'), findsOneWidget);
+    });
+
+    testWidgets('tapping the trend chart shows the point value',
+        (tester) async {
+      await _pumpScreen(tester, snapshot: fullSnapshotJson());
+      expect(find.byKey(const ValueKey('chartTooltip')), findsNothing);
+      // Centre of the chart = middle game (index 1, oldest = 1).
+      await tester.tap(find.byKey(const ValueKey('trendChart')));
+      await tester.pump();
+      expect(find.text('Game 2 · 82 · Syndra vs Yasuo'), findsOneWidget);
+    });
+
+    testWidgets('tapping the minute curves shows per-minute diffs',
+        (tester) async {
+      await _pumpScreen(tester, snapshot: fullSnapshotJson());
+      await tester.tap(find.byKey(const ValueKey('proDepthToggle')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('minuteChart')));
+      await tester.pump();
+      expect(find.textContaining(':00 · Gold '), findsOneWidget);
+      expect(find.text('Early death'), findsOneWidget);
+    });
+  });
+
+  group('streak / form', () {
+    MatchReview m(bool win) => MatchReview(matchId: '$win', win: win);
+
+    test('computeStreak counts the newest run', () {
+      expect(computeStreak(const []), 0);
+      expect(computeStreak([m(true), m(true), m(false)]), 2);
+      expect(computeStreak([m(false), m(false), m(false), m(true)]), -3);
+    });
+
+    test('recentForm is oldest to newest and capped at 10', () {
+      final s = AnalysisSnapshot(
+        matches: [m(true), m(false), for (var i = 0; i < 12; i++) m(true)],
+      );
+      final form = s.recentForm();
+      expect(form, hasLength(10));
+      expect(form.last, isTrue);
+      expect(form[form.length - 2], isFalse);
+    });
+
+    test('Standing.label uses top/bottom bands', () {
+      expect(
+        const Standing(tier: 'EMERALD', metric: 'cs10', percentile: 68).label,
+        'Top 32%',
+      );
+      expect(
+        const Standing(tier: 'EMERALD', metric: 'cs10', percentile: 12).label,
+        'Bottom 12%',
+      );
+      expect(
+        const Standing(tier: 'EMERALD', metric: 'cs10', percentile: 100).label,
+        'Top 1%',
+      );
     });
   });
 

@@ -113,8 +113,8 @@ class AppColors extends ThemeExtension<AppColors> {
     borderAccent: Color(0x24FFFFFF), // white @0.14
     hairlineSoft: Color(0x0DFFFFFF), // white @0.05
     textPrimary: Color(0xFFF5F5F7),
-    textSecondary: Color(0x85F5F5F7), // @0.52
-    textDisabled: Color(0x4DF5F5F7), // @0.30
+    textSecondary: Color(0xA8F5F5F7), // @0.66 — 7.6:1 on glass card
+    textDisabled: Color(0x80F5F5F7), // @0.50 — 4.9:1 on glass card (WCAG AA)
     gold: Color(0xFFE7C896), // champagne
     goldSubtle: Color(0x1AE7C896), // @0.10
     champagneLine: Color(0x38E7C896), // @0.22
@@ -148,8 +148,8 @@ class AppColors extends ThemeExtension<AppColors> {
     borderAccent: Color(0x24000000), // black @0.14
     hairlineSoft: Color(0x0D000000), // black @0.05
     textPrimary: Color(0xFF1D1D1F),
-    textSecondary: Color(0x8F1D1D1F), // @0.56
-    textDisabled: Color(0x521D1D1F), // @0.32
+    textSecondary: Color(0xB81D1D1F), // @0.72 — 6.4:1 on glass card
+    textDisabled: Color(0x9E1D1D1F), // @0.62 — 4.6:1 on glass card (WCAG AA)
     gold: Color(0xFF9A6F1E), // champagne (dark)
     goldSubtle: Color(0x149A6F1E), // @0.08
     champagneLine: Color(0x3D9A6F1E), // @0.24

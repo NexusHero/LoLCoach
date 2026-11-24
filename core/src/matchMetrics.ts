@@ -1,4 +1,4 @@
-import type { EarlyDeath, MatchReview, MinuteDiff, ShopVisit } from "./analysisTypes.js";
+import type { EarlyDeath, MatchReview, MinuteDiff, ObjectiveEvent, ShopVisit } from "./analysisTypes.js";
 import type {
   RiotMatch,
   RiotParticipant,
@@ -131,23 +131,32 @@ function epicObjectives(timeline: RiotTimeline): RiotTimelineEvent[] {
   return result;
 }
 
+function wasPresent(timeline: RiotTimeline, obj: RiotTimelineEvent, participantId: number): boolean {
+  if (obj.killerId === participantId) return true;
+  const minute = Math.round(obj.timestamp / MINUTE_MS);
+  const pos = participantFrame(timeline, minute, participantId)?.position;
+  return !!(pos && obj.position && Math.hypot(pos.x - obj.position.x, pos.y - obj.position.y) <= OBJECTIVE_PRESENCE_RADIUS);
+}
+
+export function computeObjectiveEvents(
+  timeline: RiotTimeline,
+  participantId: number,
+  teamId: number,
+): ObjectiveEvent[] {
+  return epicObjectives(timeline).map((obj) => ({
+    time: Math.floor(obj.timestamp / 1000),
+    type: obj.monsterType ?? "UNKNOWN",
+    ownTeam: obj.killerTeamId === teamId,
+    present: wasPresent(timeline, obj, participantId),
+  }));
+}
+
 export function computeObjectivePresence(
   timeline: RiotTimeline,
   participantId: number,
 ): { total: number; present: number } {
   const objectives = epicObjectives(timeline);
-  let present = 0;
-  for (const obj of objectives) {
-    if (obj.killerId === participantId) {
-      present += 1;
-      continue;
-    }
-    const minute = Math.round(obj.timestamp / MINUTE_MS);
-    const pos = participantFrame(timeline, minute, participantId)?.position;
-    if (pos && obj.position && Math.hypot(pos.x - obj.position.x, pos.y - obj.position.y) <= OBJECTIVE_PRESENCE_RADIUS) {
-      present += 1;
-    }
-  }
+  const present = objectives.filter((obj) => wasPresent(timeline, obj, participantId)).length;
   return { total: objectives.length, present };
 }
 
@@ -187,7 +196,7 @@ export function computeItemTiming(
   timeline: RiotTimeline,
   participantId: number,
   items: ItemLookup,
-): { firstCoreItem?: string; firstCoreItemMinute?: number; shopVisits: ShopVisit[] } {
+): { firstCoreItem?: string; firstCoreItemId?: number; firstCoreItemMinute?: number; shopVisits: ShopVisit[] } {
   const purchases = effectivePurchases(timeline, participantId);
 
   const core = purchases.find((p) => {
@@ -210,10 +219,12 @@ export function computeItemTiming(
         time: Math.floor(p.timestamp / 1000),
         goldBefore: participantFrame(timeline, minute, participantId)?.currentGold ?? 0,
         itemsBought: [],
+        itemIds: [],
       };
       shopVisits.push(current);
     }
     current.itemsBought.push(name);
+    current.itemIds?.push(p.itemId ?? 0);
     lastTime = p.timestamp;
   }
 
@@ -221,6 +232,7 @@ export function computeItemTiming(
     ...(core
       ? {
           firstCoreItem: items(core.itemId ?? 0)?.name,
+          firstCoreItemId: core.itemId,
           firstCoreItemMinute: Math.round((core.timestamp / MINUTE_MS) * 10) / 10,
         }
       : {}),
@@ -298,6 +310,7 @@ export function computeMatchReview(
     objectivePresence: presence.total > 0 ? presence.present / presence.total : 0,
     objectivesTotal: presence.total,
     objectivesPresent: presence.present,
+    objectiveEvents: computeObjectiveEvents(timeline, me.participantId, me.teamId),
     minuteDiffs: computeMinuteDiffs(timeline, me.participantId, opp?.participantId),
     ...computeItemTiming(timeline, me.participantId, items),
   };

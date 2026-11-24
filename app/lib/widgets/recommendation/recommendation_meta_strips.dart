@@ -40,7 +40,7 @@ class MatchupDuelChip extends StatelessWidget {
             'vs $opponentChampion',
             style: TextStyle(
               color: colors.textSecondary,
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.3,
             ),

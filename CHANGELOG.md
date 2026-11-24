@@ -8,6 +8,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · Versioning: 
 
 ## [Unreleased]
 
+### Fixed
+- The BUILD PLAN card no longer sits under a permanent violet wash: the new-recommendation flash started at full strength and stayed there until the first new recommendation.
+
+### Changed
+- Readability: secondary and tertiary text reach at least 4.5:1 contrast in both themes, and 12 px is the minimum text size.
+- Analysis board: champion portraits in matches, matchups and the briefing; item icons for the first core item and shop visits; trend and minute charts with axis values, tap-for-value, and markers for early deaths and objectives; "Top x% · TIER" badges from the collected benchmarks; tier badge, streak and last-10 form in the header.
+- Live HUD: the coach command bar is collapsed to one row by default.
+
 ### Added
 - **Matchup briefing at game start.** For your lane matchup the live view shows up to three lines for the first four minutes: how trades usually go and the opponent's most dangerous power spike (from the LLM, phrased as facts), and the numbers of your last reviewed game in this matchup plus the saved matchup note. Dismissible.
 - **Post-game review & analysis board.** The core pulls your last 20 Ranked Solo/Duo games from the Riot API (Riot ID and region in Settings, `RIOT_API_KEY` in `core/.env`) and computes per game: CS and CS difference at 10:00, deaths before 14:00 with map zone and killer, gold and XP difference at 15:00, objective presence, minute-by-minute lane differences, first core item and shop visits. New games are fetched automatically shortly after a game ends.

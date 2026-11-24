@@ -127,6 +127,63 @@ class EarlyDeath {
   final int enemiesInvolved;
 }
 
+class ObjectiveEvent {
+  const ObjectiveEvent({
+    required this.time,
+    this.type = '',
+    this.ownTeam = false,
+    this.present = false,
+  });
+
+  factory ObjectiveEvent.fromJson(Map<String, dynamic> json) => ObjectiveEvent(
+        time: _i(json['time']),
+        type: _s(json['type']),
+        ownTeam: json['ownTeam'] == true,
+        present: json['present'] == true,
+      );
+
+  /// Game time in seconds.
+  final int time;
+
+  /// DRAGON, BARON_NASHOR, RIFTHERALD, HORDE (voidgrubs), ATAKHAN.
+  final String type;
+
+  /// Did the player's team take it?
+  final bool ownTeam;
+  final bool present;
+}
+
+/// Where the player's recent average stands within one tier's laners.
+class Standing {
+  const Standing({
+    required this.tier,
+    required this.metric,
+    this.percentile = 0,
+  });
+
+  factory Standing.fromJson(Map<String, dynamic> json) => Standing(
+        tier: _s(json['tier']),
+        metric: _s(json['metric']),
+        percentile: _d(json['percentile']).clamp(0, 100).toDouble(),
+      );
+
+  final String tier;
+
+  /// Contract MetricKey (cs10 | earlyDeaths | gold15 | objectivePresence).
+  final String metric;
+
+  /// 0–100: share of the tier's laners the player beats (already inverted
+  /// for earlyDeaths).
+  final double percentile;
+
+  /// "Top 32%" / "Bottom 20%".
+  String get label {
+    final p = percentile.round();
+    if (p < 50) return 'Bottom ${p.clamp(1, 100)}%';
+    return 'Top ${(100 - p).clamp(1, 100)}%';
+  }
+}
+
 class MinuteDiff {
   const MinuteDiff({
     required this.minute,
@@ -153,6 +210,7 @@ class ShopVisit {
     required this.time,
     this.goldBefore = 0,
     this.itemsBought = const [],
+    this.itemIds = const [],
   });
 
   factory ShopVisit.fromJson(Map<String, dynamic> json) => ShopVisit(
@@ -161,12 +219,18 @@ class ShopVisit {
         itemsBought: (json['itemsBought'] is List)
             ? (json['itemsBought'] as List).map((e) => '$e').toList()
             : const [],
+        itemIds: (json['itemIds'] is List)
+            ? [for (final e in json['itemIds'] as List) _i(e)]
+            : const [],
       );
 
   /// Game time in seconds of the first purchase in the visit.
   final int time;
   final int goldBefore;
   final List<String> itemsBought;
+
+  /// Item ids parallel to [itemsBought]; empty for reviews from older cores.
+  final List<int> itemIds;
 }
 
 class MatchReview {
@@ -194,7 +258,9 @@ class MatchReview {
     this.minuteDiffs = const [],
     this.firstCoreItemMinute,
     this.firstCoreItem,
+    this.firstCoreItemId,
     this.shopVisits = const [],
+    this.objectiveEvents = const [],
     this.aiReview,
   });
 
@@ -222,7 +288,10 @@ class MatchReview {
         minuteDiffs: _list(json['minuteDiffs'], MinuteDiff.fromJson),
         firstCoreItemMinute: _dn(json['firstCoreItemMinute']),
         firstCoreItem: _sn(json['firstCoreItem']),
+        firstCoreItemId: _in(json['firstCoreItemId']),
         shopVisits: _list(json['shopVisits'], ShopVisit.fromJson),
+        objectiveEvents:
+            _list(json['objectiveEvents'], ObjectiveEvent.fromJson),
         aiReview: _sn(json['aiReview']),
       );
 
@@ -257,7 +326,12 @@ class MatchReview {
   final List<MinuteDiff> minuteDiffs;
   final double? firstCoreItemMinute;
   final String? firstCoreItem;
+  final int? firstCoreItemId;
   final List<ShopVisit> shopVisits;
+
+  /// Epic objectives with their taker and the player's presence; may be
+  /// empty for older games.
+  final List<ObjectiveEvent> objectiveEvents;
 
   /// LLM-written review, absent for backfilled games.
   final String? aiReview;
@@ -434,6 +508,7 @@ class AnalysisSnapshot {
     this.nextTier,
     this.matches = const [],
     this.benchmarks = const [],
+    this.standings = const [],
     this.goal,
     this.backfillSummary,
     this.sync = const SyncInfo(),
@@ -449,6 +524,7 @@ class AnalysisSnapshot {
         nextTier: _sn(json['nextTier']),
         matches: _list(json['matches'], MatchReview.fromJson),
         benchmarks: _list(json['benchmarks'], Benchmark.fromJson),
+        standings: _list(json['standings'], Standing.fromJson),
         goal: json['goal'] is Map
             ? TrainingGoal.fromJson(_m(json['goal']))
             : null,
@@ -468,6 +544,9 @@ class AnalysisSnapshot {
   /// Newest first, at most 20.
   final List<MatchReview> matches;
   final List<Benchmark> benchmarks;
+
+  /// Percentile standings; missing until a tier has ≥ 50 samples.
+  final List<Standing> standings;
   final TrainingGoal? goal;
   final String? backfillSummary;
   final SyncInfo sync;
@@ -477,6 +556,22 @@ class AnalysisSnapshot {
   final String? keyProblem;
 
   /// Benchmark for [tier], preferring the role of the newest match.
+  Standing? standingFor(String? tier, AnalysisMetric metric) {
+    if (tier == null) return null;
+    for (final st in standings) {
+      if (st.tier == tier && st.metric == metric.key) return st;
+    }
+    return null;
+  }
+
+  /// Current streak over [matches] (newest first): +n wins or -n losses,
+  /// 0 when there are no matches.
+  int get streak => computeStreak(matches);
+
+  /// Last [n] results, oldest → newest (true = win).
+  List<bool> recentForm([int n = 10]) =>
+      matches.take(n).map((m) => m.win).toList().reversed.toList();
+
   Benchmark? benchmarkFor(String? tier) {
     if (tier == null) return null;
     final candidates = benchmarks.where((b) => b.tier == tier).toList();
@@ -536,6 +631,19 @@ class AnalysisQuestion {
 }
 
 /// Formats game seconds as m:ss.
+/// Streak of the newest matches (newest first): +n = n wins in a row,
+/// -n = n losses in a row.
+int computeStreak(List<MatchReview> newestFirst) {
+  if (newestFirst.isEmpty) return 0;
+  final win = newestFirst.first.win;
+  var n = 0;
+  for (final m in newestFirst) {
+    if (m.win != win) break;
+    n++;
+  }
+  return win ? n : -n;
+}
+
 String formatGameTime(int seconds) {
   final m = seconds ~/ 60;
   final s = (seconds % 60).toString().padLeft(2, '0');
