@@ -6,28 +6,29 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-> **Real-time AI coaching overlay for League of Legends — runs entirely on your machine, no account required.**
+> **A League of Legends training system: post-game review, rank benchmarks, 5-game goals and a pre-lane briefing — runs on your machine, Riot-policy compliant.**
 
-| Off-game (standby radar) | In-game (Bento HUD cockpit) |
+| Off-game (standby radar) | In-game (live HUD) |
 |---|---|
-| ![LoL Coach — waiting for a match](docs/images/offgame-lolcoach.png) | ![LoL Coach — live recommendations](docs/images/ingame-lolcoach.png) |
+| ![LoL Coach — waiting for a match](docs/images/offgame-lolcoach.png) | ![LoL Coach — live view](docs/images/ingame-lolcoach.png) |
 
-An AI-powered in-game coaching assistant for League of Legends. A local Node.js core backend reads live game data from the Riot Games Live Client API and streams real-time recommendations to a modern Esports HUD desktop app built with Flutter over WebSocket.
+*Screenshots are from 2026-10, before the training-system rework; the live view no longer shows "do this now" advice or enemy cooldowns.*
 
-The coaching engine is LLM-powered (Claude, OpenAI, or Gemini): it turns your live game state into role-aware, matchup-specific advice — not generic tips. Without an API key the app still runs locally and shows your live scoreboard and game state; item advice requires a configured provider.
+LoL Coach is built for players who want to climb and for high-elo players who want hard numbers. A local Node.js core reads your live game (Riot Live Client API) and your ranked history (Riot API), computes the review metrics, and streams everything over WebSocket to a Flutter desktop app with an esports-HUD look. An LLM of your choice (Claude, OpenAI or Gemini) writes the texts — **every number is computed by code, never by the model.**
 
 ---
 
 ## Why LoL Coach?
 
-| | LoL Coach | Generic tier-list sites | In-client coach |
+| | LoL Coach | Stat sites | Overlay apps |
 | --- | --- | --- | --- |
-| Reads your **live** game state | ✅ | ❌ | ✅ |
-| Role-aware advice | ✅ | ❌ | partial |
-| Lane matchup analysis vs. your actual opponent | ✅ | ❌ | ❌ |
-| Runs **locally** — your game data stays on your PC | ✅ | ❌ | ✅ |
-| Bring your own LLM key (Claude / OpenAI / Gemini) | ✅ | ❌ | ❌ |
-| Works on a second screen / phone | ✅ | — | ❌ |
+| Review of *your* games with lane diffs at 10/15 min | ✅ | partial | partial |
+| Benchmarks of the next rank and Master+ for your role | ✅ (self-collected) | ✅ | ❌ |
+| Training goal per 5-game block, checked automatically | ✅ | ❌ | ❌ |
+| Matchup briefing from your own history | ✅ | ❌ | partial |
+| Ask questions about your match history | ✅ | ❌ | ❌ |
+| Runs **locally**, your data stays on your PC | ✅ | ❌ | partial |
+| Bring your own LLM key | ✅ | ❌ | ❌ |
 | Open source, no account | ✅ | ❌ | ❌ |
 
 ---
@@ -42,70 +43,82 @@ cd core && npm install && npm run dev
 cd app && flutter pub get && flutter run
 ```
 
-Open **Settings**, enter your Summoner Name and an LLM API key (required for item advice — without one you get live stats only), then start a game.
-
----
+1. Put a Riot API key into `core/.env` (`RIOT_API_KEY=RGAPI-…`, see [Riot API key](#riot-api-key)).
+2. In the app's **Settings** enter your Summoner Name, your **Riot ID** (`Name#TAG`) and region, and optionally an LLM provider and key.
+3. Open **Analysis** from the top bar: your last 20 Ranked Solo/Duo games load within seconds.
 
 ---
 
 ## What it does
 
-- **Modern Esports HUD & Bento Cockpit** — adaptive two-column desktop layout with 3D specular glass cards, tabular numeric telemetry (timer, gold, KDA, CS), and dynamic Riot Data Dragon champion splash art backdrops.
-- **Role-aware strategy** — advice adapts to your role. A support gets vision-score feedback and ADC-protection cues; a Tryndamere top gets split-push timing, not "group for teamfights".
-- **Lane matchup duel & analysis** — visual champion duel chip (`Your Champ vs. Lane Opponent`) comparing your CS, KDA, level and items against your specific lane opponent in real time.
-- **Concrete counter-play** — one actionable sentence: what to do *right now* against this specific champion.
-- **Visual item build path** — highlights your immediate core item spike and numbers subsequent situational counter-items (`2`, `3`, …) across all 170+ champions.
-- **Pro scoreboard & stat gauges** — side-by-side 5v5 team comparison with a live team-kills tug-of-war bar and colour-coded champion stat gauges (`HP`, `AD`/`AP`, `ARM`, `MR`, `CRIT`).
-- **Multi-provider AI** — plug in your own Claude, OpenAI, or Gemini API key. Item advice requires a configured provider; without one the app still shows live game state and the scoreboard.
-- **Trigger on events** — recommendations fire on `GAME_STARTED`, `ITEM_PURCHASED`, `PLAYER_DIED`, `HIGH_GOLD_REACHED`, and on manual request via the integrated HUD `Refresh` action button.
+### Analysis board (after the game)
+- **Post-game review** of every Ranked Solo/Duo game, fetched automatically shortly after the game ends: CS and CS difference at 10:00, deaths before 14:00 with map zone and killer, gold and XP difference at 15:00, objective presence.
+- **Rank benchmarks you collect yourself** — in the background the core samples ranked games of the tier above yours and of Master, Grandmaster and Challenger for your main role, stores only averages and histograms, and re-collects every patch.
+- **Standing badges** such as "Top 32% · EMERALD" per metric, plus tier badge, streak and last-10 form.
+- **Training goal** — one goal per block of 5 games, picked from the metric with the largest gap to the next tier. Achieved at 4 of 5 games, otherwise the block repeats.
+- **Trend chart** over your last 20 games with the next-tier benchmark as a dashed line; tap for exact values.
+- **Pro depth** (collapsible): minute-by-minute gold/XP/CS difference vs. your lane opponent with early-death and objective markers, matchup table, first core item and shop visits with item icons.
+- **AI texts** (with a provider): a short review per new game, the goal sentence, a summary of your backfilled games, answers to questions about your history ("Why do I lose lane against Zed?"), and one matchup insight per game saved to the local matchup memory.
+
+### Briefing (game start)
+- For your lane matchup, up to three lines for the first four minutes: how trades usually go and the opponent's most dangerous spike (LLM, phrased as facts), and the numbers of your last reviewed game in this exact matchup plus your saved note.
+
+### Live HUD (in game)
+- Objective countdowns (Dragon, Elder, Voidgrubs, Rift Herald, Baron) with current-season timings, own unspent gold, the next item to buy, and the LLM build plan.
+- **Review markers** — press **F1** or type "Marker: bad trade"; the moment shows up next to the game in the review.
+- Lane matchup chip, 5v5 scoreboard and champion stat gauges.
+
+### What it deliberately does not do
+Riot's third-party policy forbids tools that track enemy cooldowns, raise power-spike or gank alarms, or dictate decisions in game. LoL Coach therefore shows **no** enemy ability or summoner-spell timers, no "do this now" instructions and no screen or minimap reading. Positions, waves and vision are only analysed after the game, from Riot's match timeline.
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                     Your PC (in-game)                    │
-│                                                          │
-│  LoL Client  ──►  Riot Live Client API (port 2999)       │
-│                            │                             │
-│                            ▼                             │
-│              Node.js Core (TypeScript)                   │
-│          ┌─────────────────────────────────┐             │
-│          │  Poller → Parser → EventDetector│             │
-│          │  RecommendationEngine + Cache    │             │
-│          │  StateMinifier                  │             │
-│          │  LLM Provider (Claude/OpenAI/..)│             │
-│          │  WebSocket Server (port 8765)   │             │
-│          └─────────────────────────────────┘             │
-└──────────────────────────────────────────────────────────┘
-                            │  WebSocket (LAN)
-                            ▼
-              ┌─────────────────────────┐
-              │  Flutter Desktop App    │
-              │  Bento HUD cockpit      │
-              │  Visual item build path │
-              │  Lane matchup duel      │
-              │  Tug-of-war scoreboard  │
-              │  Settings & Connection  │
-              └─────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      Your PC (in-game)                        │
+│                                                               │
+│  LoL Client ──► Live Client API (port 2999)                   │
+│  Riot API (account, league, match-v5 + timeline)              │
+│                         │                                     │
+│                         ▼                                     │
+│              Node.js Core (TypeScript)                        │
+│     ┌──────────────────────────────────────────────┐          │
+│     │ Poller → Parser → EventDetector              │          │
+│     │ RecommendationEngine + Cache + LLM provider  │          │
+│     │ AnalysisService: sync, review, goals, AI     │          │
+│     │ BenchmarkAggregator (background, per patch)  │          │
+│     │ Briefing · Vector matchup memory             │          │
+│     │ WebSocket server (127.0.0.1:8765)            │          │
+│     └──────────────────────────────────────────────┘          │
+└──────────────────────────────────────────────────────────────┘
+                         │  WebSocket
+                         ▼
+              ┌──────────────────────────┐
+              │  Flutter app             │
+              │  Live HUD + briefing     │
+              │  Analysis board          │
+              │  Settings & connection   │
+              └──────────────────────────┘
 ```
 
 | Component | Tech |
 |-----------|------|
 | Core | Node.js 18+, TypeScript, Zod, ws, tsyringe (DI), @anthropic-ai/sdk, openai, @google/genai |
-| Desktop app | Flutter 3.x, Dart, flutter_riverpod (DI/state), web_socket_channel, flutter_secure_storage, shared_preferences |
-| Tests | Jest + ts-jest (core), flutter_test (app) |
+| Desktop app | Flutter 3.50, Dart, `material_ui`, flutter_riverpod, web_socket_channel, flutter_secure_storage, shared_preferences |
+| Tests | Jest + ts-jest (core), flutter_test incl. golden tests (app) |
 
-> **Architecture documentation:** a full [arc42 architecture document](docs/architecture.md) covers the building blocks, runtime scenarios, and decisions. Diagrams are authored in **PlantUML** (`docs/umls/*.puml`, rendered to `*.svg`) and include sequence diagrams for the recommendation pipeline, the WebSocket auth handshake, and the tsyringe DI bootstrap.
+> **Architecture documentation:** a full [arc42 architecture document](docs/architecture.md) covers the building blocks, runtime scenarios, and decisions. Diagrams are authored in **PlantUML** (`docs/umls/*.puml`, rendered to `*.svg`).
 
 ---
 
 ## Prerequisites
 
 - Node.js 18+
-- Flutter SDK 3.4+
-- League of Legends installed (the core backend reads from the local Live Client API)
+- Flutter SDK 3.50 (CI and release builds are pinned to 3.50.0)
+- League of Legends installed (the core reads the local Live Client API)
+- A Riot API key for the review and benchmarks
 
 ---
 
@@ -116,15 +129,22 @@ Open **Settings**, enter your Summoner Name and an LLM API key (required for ite
 ```bash
 cd core
 npm install
+cp .env.example .env   # then set RIOT_API_KEY (and optionally ANTHROPIC_API_KEY)
 ```
 
-Start the core backend:
+Start the core:
 ```bash
 npm run dev        # development (watch mode)
 npm start          # production (requires npm run build first)
 ```
 
-The core backend waits for an active game. Once detected it starts pushing game state and recommendations over WebSocket.
+### Riot API key
+
+Get a key at [developer.riotgames.com](https://developer.riotgames.com) and set `RIOT_API_KEY` in `core/.env`.
+
+- **Development keys expire every 24 hours.** Replace the value in `core/.env` and press **Refresh** in the Analysis screen — the core re-reads the key on every sync, no restart needed. While the key is invalid the board shows a warning and benchmark collection pauses.
+- For daily use register a **personal key** (does not expire, same rate limits).
+- All Riot calls go through a rate limiter (20 per second, 100 per two minutes).
 
 ### 2. Flutter app
 
@@ -134,71 +154,66 @@ flutter pub get
 flutter run
 ```
 
-In the **Settings** tab configure:
-- Your Summoner Name
-- The Core IP and Port (default `127.0.0.1:8765`)
-- Your LLM Provider (None, Claude, OpenAI, or Gemini) and API Key
+In **Settings** configure:
+- Summoner Name, **Riot ID** (`Name#TAG`) and **region**
+- Core IP and port (default `127.0.0.1:8765`)
+- LLM provider (None, Claude, OpenAI or Gemini) and API key
 
-Settings are persisted locally via `shared_preferences`. Once connected the app switches to the **Coach** tab automatically.
+Settings are stored locally; API keys in the system keychain.
 
 ---
 
 ## How it works
 
-1. **Polling** — The core polls `https://127.0.0.1:2999/liveclientdata/allgamedata` every second.
-2. **Event detection** — `EventDetector` compares consecutive snapshots and emits typed events.
-3. **Recommendation engine** — On each trigger event `RecommendationEngine` requests an LLM analysis (a `CacheService` reuses prior analyses keyed on state + risk level to avoid duplicate calls). Without a configured provider this step is skipped — the app shows live game state only.
-4. **State minification** — Before calling the LLM, `StateMinifier` distils the game snapshot to CS, vision score, KDA, position, gold and live status for every player — minimising token cost while keeping all coaching-relevant data.
-5. **Role-aware LLM analysis** — The LLM receives the minified state, the player's role, their lane opponent's stats, and role-specific instructions. It returns a structured JSON with `winCondition`, `immediateAction`, `lateGamePlan`, `laneMatchupAnalysis` and `counterPlay`. Returned item ids are validated against Data Dragon and owned items to drop hallucinated or duplicate picks.
-6. **WebSocket broadcast** — Events and recommendations are pushed to all connected Flutter clients as JSON.
-7. **Session token budget** — An optional input-token cap (*Session Token Budget* in Settings; default: unlimited) guards against runaway API spend. Once the cumulative session input-token count reaches the cap, the core emits `LLM_BUDGET_EXCEEDED` and skips further LLM calls, and the token-usage progress bar in the Recommendation panel turns red. The budget resets when a new game session starts.
-8. **Local-only security** — The core binds to `127.0.0.1` and verifies every WebSocket upgrade with a shared secret auto-generated at `~/.lolcoach/.secret`. The Flutter app reads the same file from disk; connections from other machines or without the correct token are rejected.
+**Live game**
+1. **Polling** — the core polls `https://127.0.0.1:2999/liveclientdata/allgamedata` every second.
+2. **Event detection** — `EventDetector` compares snapshots and emits `GAME_STARTED`, `ITEM_PURCHASED`, `PLAYER_DIED`, `HIGH_GOLD_REACHED`.
+3. **Item advice** — on these events `RecommendationEngine` asks the LLM for build advice (cached per game state); returned item ids are validated against Data Dragon.
+4. **Briefing** — on `GAME_STARTED` the `AnalysisService` builds the matchup briefing and broadcasts `MATCHUP_BRIEFING`.
+
+**After the game**
+5. **Sync** — when the game ends the core waits until Riot publishes the match, then fetches match and timeline (`riotApi.ts`).
+6. **Metrics** — `matchMetrics.ts` computes the review from the timeline frames and events; remakes are skipped.
+7. **Goals** — `goals.ts` checks the current 5-game block and picks the next goal from the next-tier benchmark (absolute CS@10 and gold@15, because lane differences average to zero over a rank).
+8. **Benchmarks** — `BenchmarkAggregator` samples ladder players' recent games in the background whenever no game runs, and resumes after restarts.
+9. **Broadcast** — `ANALYSIS_UPDATE` carries the whole board; `ASK_ANALYSIS` / `ANALYSIS_ANSWER` handle questions.
+
+**Data and security**
+- Your reviewed games, goals and benchmark aggregates live in `~/.lolcoach/analysis`; of other players only averages and histograms are stored.
+- The core binds to `127.0.0.1` and verifies every WebSocket upgrade with a secret auto-generated at `~/.lolcoach/.secret`.
+- An optional session token budget caps LLM input tokens (`LLM_BUDGET_EXCEEDED`).
 
 ---
 
 ## Project structure
 
 ```
-lolclient/
-├── core/                     # Backend (Node.js/TypeScript)
-│   ├── src/
-│   │   ├── types.ts          # Zod schemas + TypeScript types
-│   │   ├── poller.ts         # Live Client API polling
-│   │   ├── parser.ts         # Raw data → ParsedGameState
-│   │   ├── eventDetector.ts  # State-change event detection
-│   │   ├── stateMinifier.ts  # Token optimisation for LLM
-│   │   ├── llmProvider.ts    # AI factory + prompt builder
-│   │   ├── recommendationEngine.ts # LLM analysis + cache + item validation
-│   │   ├── heuristic.ts      # Legacy rule-based engine (not in runtime path)
-│   │   ├── orchestrator.ts   # Wires events → recommendations → broadcast
-│   │   ├── wsServer.ts       # WebSocket server
-│   │   ├── data/
-│   │   │   ├── champions.json  # AP / CC / healer classification (~170 champs)
-│   │   │   └── items.json      # Item ID → name mapping
-│   │   └── index.ts          # Entry point / DI wiring
-│   └── src/__tests__/        # Jest unit + integration + E2E tests
+LOLRecommender/
+├── core/                         # Backend (Node.js/TypeScript)
+│   └── src/
+│       ├── poller.ts · parser.ts · eventDetector.ts   # live game input
+│       ├── recommendationEngine.ts · llmProvider.ts · promptBuilder.ts
+│       ├── macroTracker.ts       # objective timers, informational alerts
+│       ├── tacticalCommandService.ts  # coach commands, review markers
+│       ├── riotApi.ts            # Riot API client + rate limiter
+│       ├── matchMetrics.ts       # review metrics from match + timeline
+│       ├── analysisService.ts    # sync, goals, AI texts, briefing
+│       ├── benchmarkAggregator.ts# rank benchmarks + histograms
+│       ├── goals.ts · briefing.ts · analysisStore.ts
+│       ├── analysisTypes.ts      # contract shared with the app
+│       ├── orchestrator.ts · messageRouter.ts · wsServer.ts · index.ts
+│       └── __tests__/            # Jest tests, incl. a real anonymised match fixture
 │
-├── app/                      # UI (Flutter — Modern Esports HUD)
-│   ├── lib/
-│   │   ├── controllers/      # SettingsController + ThemeController
-│   │   ├── models/           # Data models (Strategy, ItemRecommendation, …)
-│   │   ├── services/         # CoachService, WsClient, StorageService
-│   │   ├── providers.dart    # Riverpod provider definitions (DI / lifecycle)
-│   │   ├── screens/          # MainScreen, HomeScreen, SettingsScreen
-│   │   ├── theme/            # AppColors, AppTheme, AppTextStyles (tabular HUD)
-│   │   ├── utils/            # Data Dragon icon & splash art helpers
-│   │   └── widgets/          # GameView (Bento HUD), RecommendationPanel,
-│   │                         # GameTopBar, LocalPlayerCard, ScoreboardSection
-│   └── test/                 # Widget, unit and golden tests
+├── app/                          # Flutter app (esports HUD)
+│   └── lib/
+│       ├── screens/              # home, analysis, settings
+│       ├── widgets/              # live HUD, matchup briefing card
+│       │   └── analysis/         # board: header, goal, tiles, trend, matches, pro depth
+│       ├── models/ · services/ · theme/ · utils/
+│       └── providers.dart
 │
-├── skills/                   # Agent Skills
-│   ├── lolcoach-agents/      # Primary vendor-neutral skill
-│   ├── lolcoach-claude/      # Claude-specific rules
-│   └── lolcoach-gemini/      # Gemini-specific rules
-│
-└── deployment/               # Build & packaging scripts
-    ├── build_unix.sh         # macOS + Linux build script
-    └── build_installer.ps1   # Windows MSIX build script
+├── skills/                       # Agent skills
+└── deployment/                   # Build & packaging scripts
 ```
 
 ---
@@ -235,8 +250,7 @@ flutter test --update-goldens test/widgets/recommendation_panel_golden_test.dart
                                                           # regenerate golden baselines
 ```
 
-> **Golden tests** require a baseline PNG committed under `app/test/goldens/`.
-> Run `--update-goldens` once and commit the generated files before golden tests will pass.
+> **Golden tests** compare against baselines in `app/test/widgets/goldens/` and are rendered with the pinned Flutter version (3.50). CI skips them; run them locally with `./test.sh --goldens`.
 
 ---
 
